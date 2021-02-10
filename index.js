@@ -125,7 +125,7 @@ class LetOrConst extends ParseNode {
 		if (c=='l') {
 			if (p.get()=='e') {
 				if (p.get()=='t') {
-					return new LetOrConst(bc, p.pos, token.LET)
+					return new LetOrConst(bc, p.pos)
 				}
 			}
 		}
@@ -134,7 +134,7 @@ class LetOrConst extends ParseNode {
 				if (p.get()=='n') {
 					if (p.get()=='s') {
 						if (p.get()=='t') {
-							return new LetOrConst(bc, p.pos, token.CONST)
+							return new LetOrConst(bc, p.pos)
 						}
 					}
 				}
@@ -574,7 +574,17 @@ const Tokens = {
 	const: 1
 }
 
-let source = `const a = 'Hello World!';`
+let source = `const a = 'Hello World!';
+function main(thing) {
+	console.log(thing);
+	return 0;
+};
+let b;
+b = false;
+b = !b;
+if (b) {
+	main(a);
+}`
 let a = new Parser()
 let s = a.ParseScript(source)
 //console.dir(s, {depth:null})
