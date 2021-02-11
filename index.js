@@ -838,7 +838,6 @@ class SingleNameBinding extends ParseNode {
 }
 class FunctionBody extends ParseNode {
 	static tryMatch(src,y,a,p) {
-		debugger;
 		let sl = FunctionStatementList.tryMatch(src,y,a,p)
 		return new FunctionBody(sl.start,sl.end,[sl])
 	}
@@ -917,7 +916,7 @@ class Parser {
 			if (c != str.charAt(i)) return false
 		}
 		if (consumeIfTrue) {
-			this.goto(this.pos+len+1)
+			this.goto(this.pos+len)
 		}
 		return true
 	}
