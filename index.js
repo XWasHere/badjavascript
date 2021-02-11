@@ -86,7 +86,6 @@ class StatementList extends ParseNode {
 		while (cflag) {
 			p.consumews(false)
 			let i =  StatementListItem.tryMatch(src, y, a, r, p)
-			console.dir(i,{depth:null})
 			if (i) {
 				items.push(i)
 			}
@@ -102,6 +101,8 @@ class StatementList extends ParseNode {
 }
 class StatementListItem extends ParseNode {
 	static tryMatch(src, y, a, r, p) {
+		p.consumews(false)
+		// todo add statements
 		let d = Declaration.tryMatch(src,y,a,p)
 		if (!d) d = Statement.tryMatch(src,y,a,r,p)
 		if (d) {
@@ -534,12 +535,92 @@ class IdentifierName extends ParseNode {
 			}
 			children.push(c)
 		}
+		let bt2 = p.pos;
+		p.goto(bt)
+		if (ReservedWord.tryMatch(src,p)) {
+			p.goto(bt)
+			return undefined
+		}
+		p.goto(bt2)
 		let n = new IdentifierName(bt,p.pos)
 		n.children.push(...children)
 		return n
 	}
 }
 
+class ReservedWord extends ParseNode {
+	static tryMatch(src, p) {
+		let bt = p.pos;
+		let flag = false;
+		let found = '';
+		let c = '';
+		c = p.get();
+		switch (c) {
+			case 'a':
+				if (p.test('wait')) {
+					found = 'await';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			case 'b':
+				if (p.test('reak')) {
+					found = 'break';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			case 'c':
+				c = p.get()
+				break
+			case 'd':
+				c = p.get()
+				break
+			case 'e':
+				c = p.get()
+				break
+			case 'f':
+				c = p.get()
+				break
+			case 'i':
+				c = p.get()
+				break
+			case 'n':
+				c = p.get()
+				break
+			case 'r':
+				if (p.test('eturn')) {
+					found = 'return';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			case 's':
+				c = p.get()
+				break
+			case 't':
+				c = p.get()
+				break
+			case 'v':
+				c = p.get()
+				break
+			case 'w':
+				c = p.get()
+				break
+			case 'y':
+				if (p.test('ield')) {
+					found = 'yield';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			default:
+				p.goto(bt)
+				break
+		}
+		if (flag) return new ReservedWord(bt, p.pos);
+	}
+}
 class IdentifierStart extends ParseNode {
 	static tryMatch(src, p) {
 		let s = UnicodeIDStart.tryMatch(src,p)
@@ -647,6 +728,7 @@ class HoistableDeclaration extends ParseNode {
 class FunctionDeclaration extends ParseNode {
 	static tryMatch(src,y,a,d,p) {
 		let bt = p.pos
+		p.consumews()
 		if (p.test('function ')) {
 			let id = BindingIdentifier.tryMatch(src,y,a,p);
 			if (id) {
@@ -665,8 +747,7 @@ class FunctionDeclaration extends ParseNode {
 									p.consumews()
 									debug('a')
 									if (p.get() =='}') {
-										debug('a')
-										return new FunctionDeclaration(bt, p.pos, [id, params,body])
+										return new FunctionDeclaration(bt, p.pos, [id, params,fbody])
 									}
 								}
 							}
@@ -722,7 +803,7 @@ class FormalParameterList extends ParseNode {
 			}
 			params.push(i)
 		}
-		return new FormalParameterList(params[0].start,params[params.length-1].end,...params)
+		return new FormalParameterList(params[0].start,params[params.length-1].end,params)
 	}
 }
 
@@ -765,6 +846,7 @@ class FunctionBody extends ParseNode {
 class FunctionStatementList extends ParseNode{
 	static tryMatch(src,y,a,p) {
 		let bckt = p.pos
+		p.consumews(true)
 		let s = StatementList.tryMatch(src,y,a,1,p)
 		debug(s)
 		if (s) return new FunctionStatementList(s.start, s.end, [s])
@@ -813,14 +895,14 @@ class Parser {
 		return c
 	}
 
-	consumews(includelb=false) {
+	consumews(includelb=true) {
 		let f = true;
 		while (f) {
 			let bt = this.pos;
 			let c = this.get()
-			let a = false;
-			if (includelb) if (c != '\n') a = true;
-			if(c!=' ' && c!='	' && !a) {
+			let g = false
+			if (includelb) {if (c=='\n') g=true;}
+			if(c!=' '&&c!='\t'&&!g) {
 				f = false
 				this.goto(bt);
 			}
@@ -830,9 +912,9 @@ class Parser {
 	test(str, consumeIfTrue = true) {
 		let len = str.length
 		let p = 1
-		for (let i = 1; i-1<len; i++) {
+		for (let i = 0; i<len; i++) {
 			let c = this.peek(i)
-			if (c != str.charAt(i-1)) return false
+			if (c != str.charAt(i)) return false
 		}
 		if (consumeIfTrue) {
 			this.goto(this.pos+len+1)
@@ -850,14 +932,8 @@ let source = `const a = 'Hello World!';
 function main(thing) {
 	return 0;
 }
-let b;
-b = false;
-b = !b;
-if (b) {
-	main(a);
-}`
-//dbg = 1
-debugger;
+main(a);`
+dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
 //console.dir(s, {depth:null})
@@ -867,4 +943,4 @@ function dbgtree(t) {
 		dbgtree(c)
 	})
 }
-//dbgtree(s.ECMAScriptCode)
+dbgtree(s.ECMAScriptCode)
