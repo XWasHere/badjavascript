@@ -1,8 +1,7 @@
 let dbg
 function debug(a) {
-	if (debug)console.log(a);
+	if (dbg)console.log(a);
 }
-
 class ParseNode {
 	children = []
 	start = 0
@@ -85,8 +84,9 @@ class StatementList extends ParseNode {
 		let items = []
 		let loops = 0;
 		while (cflag) {
+			p.consumews(false)
 			let i =  StatementListItem.tryMatch(src, y, a, r, p)
-			debug()
+			console.dir(i,{depth:null})
 			if (i) {
 				items.push(i)
 			}
@@ -102,8 +102,6 @@ class StatementList extends ParseNode {
 }
 class StatementListItem extends ParseNode {
 	static tryMatch(src, y, a, r, p) {
-		p.consumews()
-		// todo add statements
 		let d = Declaration.tryMatch(src,y,a,p)
 		if (!d) d = Statement.tryMatch(src,y,a,r,p)
 		if (d) {
@@ -662,9 +660,12 @@ class FunctionDeclaration extends ParseNode {
 							p.consumews()
 							if (p.get()=='{'){
 								let fbody = FunctionBody.tryMatch(src,0,0,p)
+								debug(fbody)
 								if (fbody) {
 									p.consumews()
+									debug('a')
 									if (p.get() =='}') {
+										debug('a')
 										return new FunctionDeclaration(bt, p.pos, [id, params,body])
 									}
 								}
@@ -756,6 +757,7 @@ class SingleNameBinding extends ParseNode {
 }
 class FunctionBody extends ParseNode {
 	static tryMatch(src,y,a,p) {
+		debugger;
 		let sl = FunctionStatementList.tryMatch(src,y,a,p)
 		return new FunctionBody(sl.start,sl.end,[sl])
 	}
@@ -764,6 +766,7 @@ class FunctionStatementList extends ParseNode{
 	static tryMatch(src,y,a,p) {
 		let bckt = p.pos
 		let s = StatementList.tryMatch(src,y,a,1,p)
+		debug(s)
 		if (s) return new FunctionStatementList(s.start, s.end, [s])
 
 		return new FunctionStatementList(bckt,bckt)
@@ -810,11 +813,14 @@ class Parser {
 		return c
 	}
 
-	consumews() {
+	consumews(includelb=false) {
 		let f = true;
 		while (f) {
 			let bt = this.pos;
-			if(this.get()!=' ') {
+			let c = this.get()
+			let a = false;
+			if (includelb) if (c != '\n') a = true;
+			if(c!=' ' && c!='	' && !a) {
 				f = false
 				this.goto(bt);
 			}
@@ -850,10 +856,11 @@ b = !b;
 if (b) {
 	main(a);
 }`
-dbg = !1
+//dbg = 1
+debugger;
 let a = new Parser()
 let s = a.ParseScript(source)
-console.dir(s, {depth:null})
+//console.dir(s, {depth:null})
 function dbgtree(t) {
 	console.log(t.constructor.name + ': ' + source.substr(t.start,t.end-t.start))
 	t.children.forEach((c) => {
