@@ -990,6 +990,11 @@ dbg = 1
 let a = new Parser()
 let s = a.ParseScript(source)
 //console.dir(s, {depth:null})
-function genVisualParseTree(goal) {
-	
+function dbgtree(t,r) {
+	const treeempty = ' '
+	console.log(treeempty.repeat(r) + '(' + t.constructor.name + ')' + ' ' + source.substr(t.start,t.end-t.start))
+	t.children.forEach((c) => {
+		dbgtree(c,r+1)
+	})
 }
+dbgtree(s.ECMAScriptCode,0)
