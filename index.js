@@ -2,6 +2,7 @@ let dbg
 function debug(a) {
 	if (dbg)console.log(a);
 }
+
 class ParseNode {
 	children = []
 	start = 0
@@ -10,10 +11,15 @@ class ParseNode {
 		this.start = start
 		this.end = end
 		this.children = children
+		debug('created new '+this.constructor.name+' : '+src.substr(start,end-start))
 	}
 	static tryMatch(src, p) {
 
 	}
+}
+
+class TerminalSymbol {
+	
 }
 
 class IdentifierReference extends ParseNode {
@@ -134,35 +140,15 @@ class LexicalDeclaration  extends ParseNode {
 }
 
 class LetOrConst extends ParseNode {
-	token = undefined;
-	constructor(start, end,tokenType) {
-		super()
-		this.token = tokenType
-		this.start = start
-		this.end   = end;
-		return
-	}
 	static tryMatch(src, p) {
 		let bc = p.pos;
-		let c = p.get();
-		if (c=='l') {
-			if (p.get()=='e') {
-				if (p.get()=='t') {
+		p.consumews()
+		if (p.test('let')) {
 					return new LetOrConst(bc, p.pos)
 				}
-			}
-		}
-		else if (c=='c') {
-			if (p.get()=='o') {
-				if (p.get()=='n') {
-					if (p.get()=='s') {
-						if (p.get()=='t') {
+		else if (p.test('const')) {
 							return new LetOrConst(bc, p.pos)
 						}
-					}
-				}
-			}
-		}
 		p.goto(bc)
 		return undefined;
 	}
@@ -226,13 +212,62 @@ class Initializer extends ParseNode {
 
 class AssignmentExpression extends ParseNode {
 	static tryMatch(src, i, y, a, p) {
+		p.consumews();
 		let e = ConditionalExpression.tryMatch(src,i,y,a,p)
-		if(e) {
-			return new AssignmentExpression(e.start,e.end,[e])
+		if(e) return new AssignmentExpression(e.start,e.end,[e])
+		else {
+			let f = true
+			let items = [];
+			while (f) {
+				p.consumews()
+				let ex = LeftHandSideExpression.tryMatch(src,y,a,p)
+				if (ex) {
+					p.consumews()
+					if (p.test('=')) {
+						items.push(ex);
+		}
+					else {
+						let op = AssignmentOperator.tryMatch(src,p)
+						if (op) {
+							items.push(op,ex)
+	}
+}
+				}
+				else {
+					f = false;
+					let c = ConditionalExpression.tryMatch(src,i,y,a,p);
+					if (c) {
+						items.push(c)
+						return new AssignmentExpression(items[0].start, c.end, items);
+					} 
+				}
+			}
 		}
 	}
 }
 
+class AssignmentOperator extends ParseNode {
+	static tryMatch(src,p) {
+		let bt = p.pos;
+		let found = false
+		if (p.test('*=')) found = true
+		if (p.test('/='))found = true
+		if (p.test('%='))found = true
+		if (p.test('+='))found = true
+		if (p.test('-='))found = true
+		if (p.test('<<='))found = true
+		if (p.test('>>='))found = true
+		if (p.test('>>>='))found = true
+		if (p.test('&='))found = true
+		if (p.test('^='))found = true
+		if (p.test('*='))found = true
+		if (p.test('*='))found = true
+		if (found) {
+			return new AssignmentOperator(bt,p.pos)
+		}
+		p.goto(bt)
+	}
+}
 class ConditionalExpression extends ParseNode {
 	static tryMatch(src,i,y,a,p) {
 		let e = ShortCircuitExpression.tryMatch(src,i,y,a,p)
@@ -324,9 +359,30 @@ class ShiftExpression extends ParseNode {
 
 class AdditiveExpression extends ParseNode {
 	static tryMatch(src,y,a,p) {
+		p.consumews();
 		let e = MultiplicativeExpression.tryMatch(src,y,a,p)
-		if(e) {
-			return new AdditiveExpression(e.start,e.end,[e])
+		if (!e) return
+		let f = true;
+		let items = []
+		items.push(e)
+		while (f) {
+			p.consumews()
+			if (p.test('+')) {
+				p.consumews()
+				let e = MultiplicativeExpression.tryMatch(src,y,a,p)
+				if (e) items.push(e)
+			}
+			else if (p.test('-')) {
+				p.consumews()
+		let e = MultiplicativeExpression.tryMatch(src,y,a,p)
+				if (e) items.push(e)
+			}
+			else {
+				f = false
+			}
+		}
+		if (items.length>0) {
+			return new AdditiveExpression(items[0].start,items[items.length-1].end,items)
 		}
 	}
 }
@@ -461,11 +517,12 @@ class DecimalLiteral extends ParseNode {
 class DecimalIntegerLiteral extends ParseNode {
 	static tryMatch(src,p) {
 		p.consumews();
-		if (p.get()=='0') return new DecimalIntegerLiteral(p.pos-1,p.pos)
+		if (p.test('0')) return new DecimalIntegerLiteral(p.pos-1,p.pos)
 		else {
 			let n = [];
 			let a = NonZeroDigit.tryMatch(src,p);
 			if (!a) return
+			return new DecimalIntegerLiteral(p.pos-1,p.pos,[a])
 		}
 	}
 }
@@ -473,7 +530,7 @@ class NonZeroDigit extends ParseNode{
 	static tryMatch(src,p) {
 		let bt = p.pos
 		let n =  p.get()
-		if (n=='1'||'2'||'3'||'4'||'5'||'6'||'7'||'8'||'9') return new NonZeroDigit(bt,p.pos)
+		if (/[1-9]/.test(n)) return new NonZeroDigit(bt,p.pos)
 	}
 }
 class DecimalDigits extends ParseNode {
@@ -494,7 +551,7 @@ class DecimalDigit extends ParseNode {
 	static tryMatch(src,p) {
 		let bt = p.pos
 		let n =  p.get()
-		if (n=='1'||'2'||'3'||'4'||'5'||'6'||'7'||'8'||'9'||'0') return new DecimalDigit(bt,p.pos)		
+		if (/[1234567890]/.test(n)) return new DecimalDigit(bt,p.pos)		
 	}
 }
 class SingleStringCharacter extends ParseNode {
@@ -878,12 +935,10 @@ class Parser {
 	}
 	
 	goto(pos) {
-		debug(`GOTO ${pos}`)
 		this.pos = pos
 	}
 
 	peek(dist = 1) {
-		debug(`PEEK ${dist}`)
 		return this.src.charAt(this.pos+dist)
 	}
 
@@ -927,19 +982,14 @@ const Tokens = {
 	const: 1
 }
 
-let source = `const a = 'Hello World!';
-function main(thing) {
-	return 0;
-}
-main(a);`
-dbg = 0
+let source = `let a = 0;
+let b = 1;
+let c = a + b;`
+let src = source
+dbg = 1
 let a = new Parser()
 let s = a.ParseScript(source)
 //console.dir(s, {depth:null})
-function dbgtree(t) {
-	console.log(t.constructor.name + ': ' + source.substr(t.start,t.end-t.start))
-	t.children.forEach((c) => {
-		dbgtree(c)
-	})
+function genVisualParseTree(goal) {
+	
 }
-dbgtree(s.ECMAScriptCode)
