@@ -18,9 +18,251 @@ class ParseNode {
 	}
 }
 
-class TerminalSymbol {
-	
+// 11.6 names and keywords
+class IdentifierName extends ParseNode {
+	static tryMatch(src, p) {
+		let bt = p.pos;
+		let s = IdentifierStart.tryMatch(src,p)
+		if (!s) return undefined
+		let children = []
+		children.push(s)
+		let loopflag = 1
+		while(loopflag) {
+			let c = IdentifierPart.tryMatch(src, p)
+			if (!c) {
+				p.goto(p.pos-1);
+				loopflag=0;
+				break;
+			}
+			children.push(c)
+		}
+		let bt2 = p.pos;
+		p.goto(bt)
+		if (ReservedWord.tryMatch(src,p)) {
+			p.goto(bt)
+			return undefined
+		}
+		p.goto(bt2)
+		let n = new IdentifierName(bt,p.pos)
+		n.children.push(...children)
+		return n
+	}
 }
+
+class IdentifierStart extends ParseNode {
+	static tryMatch(src, p) {
+		let s = UnicodeIDStart.tryMatch(src,p)
+		if (!s) return undefined
+		let n = new IdentifierStart(p.pos-1,p.pos)
+		n.children.push(s)
+		return n
+	}	
+}
+
+class IdentifierPart extends ParseNode {
+	static tryMatch(src, p) {
+		let s  = UnicodeIDContinue.tryMatch(src, p)
+		if (!s) return undefined
+		let n = new IdentifierPart(p.pos-1,p.pos)
+		n.children.push(s)
+		return n
+	}
+}
+
+class UnicodeIDStart extends ParseNode {
+	static tryMatch(src, p) {
+		let a = p.get();
+		if (/[\p{L}\p{Nl}]/u.test(a)) {
+			return new UnicodeIDStart(p.pos-1, p.pos)
+		}
+	}
+}
+
+class UnicodeIDContinue extends ParseNode {
+	static tryMatch(src, p) {
+		let a = p.get();
+		if (/[\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]/u.test(a)) {
+			return new UnicodeIDContinue(p.pos-1, p.pos)
+		}
+		return undefined
+	}
+}
+
+class ReservedWord extends ParseNode {
+	static tryMatch(src, p) {
+		let bt = p.pos;
+		let flag = false;
+		let found = '';
+		let c = '';
+		c = p.get();
+		switch (c) {
+			case 'a':
+				if (p.test('wait')) {
+					found = 'await';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			case 'b':
+				if (p.test('reak')) {
+					found = 'break';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			case 'c':
+				c = p.get()
+				break
+			case 'd':
+				c = p.get()
+				break
+			case 'e':
+				c = p.get()
+				break
+			case 'f':
+				c = p.get()
+				break
+			case 'i':
+				c = p.get()
+				break
+			case 'n':
+				c = p.get()
+				break
+			case 'r':
+				if (p.test('eturn')) {
+					found = 'return';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			case 's':
+				c = p.get()
+				break
+			case 't':
+				c = p.get()
+				break
+			case 'v':
+				c = p.get()
+				break
+			case 'w':
+				c = p.get()
+				break
+			case 'y':
+				if (p.test('ield')) {
+					found = 'yield';
+					flag = true
+				}
+				else p.goto(bt)
+				break
+			default:
+				p.goto(bt)
+				break
+		}
+		if (flag) return new ReservedWord(bt, p.pos);
+	}
+}
+
+class NumericLiteral extends ParseNode {
+	static tryMatch(src,p) {
+		let n = DecimalLiteral.tryMatch(src,p);
+		if (n) return new NumericLiteral(n.start,n.end,[n]);
+	}
+}
+class DecimalLiteral extends ParseNode {
+	static tryMatch(src,p) {
+		let n = DecimalIntegerLiteral.tryMatch(src,p);
+		if (n) return new DecimalLiteral(n.start,n.end,[n]);
+	}
+}
+class DecimalIntegerLiteral extends ParseNode {
+	static tryMatch(src,p) {
+		p.consumews();
+		if (p.test('0')) return new DecimalIntegerLiteral(p.pos-1,p.pos)
+		else {
+			let n = [];
+			let a = NonZeroDigit.tryMatch(src,p);
+			if (!a) return
+			return new DecimalIntegerLiteral(p.pos-1,p.pos,[a])
+		}
+	}
+}
+class DecimalDigits extends ParseNode {
+	static tryMatch(src,p) {
+		let f = 1
+		let d = []
+		while (f) {
+			let a = DecimalDigit.tryMatch(src,p)
+			if (!a) {
+				f=0
+				return new DecimalDigits(d[0].start,d[d.length-1].end,d)
+			}
+			d.push(a)
+		}
+	}
+}
+class DecimalDigit extends ParseNode {
+	static tryMatch(src,p) {
+		let bt = p.pos
+		let n =  p.get()
+		if (/[1234567890]/.test(n)) return new DecimalDigit(bt,p.pos)		
+	}
+}
+class NonZeroDigit extends ParseNode{
+	static tryMatch(src,p) {
+		let bt = p.pos
+		let n =  p.get()
+		if (/[1-9]/.test(n)) return new NonZeroDigit(bt,p.pos)
+	}
+}
+class StringLiteral extends ParseNode {
+	static tryMatch(src,p) {
+		let bt = p.pos;
+		let type = p.get()
+		
+		if (type=='"') {
+
+		}
+		if (type=='\'') {
+			let str = SingleStringCharacters.tryMatch(src,p)
+			if (p.get()=='\'') {
+				let n = new StringLiteral(bt, p.pos)
+				if (str) n.children.push(str);
+				return n
+			}
+		}
+	}
+}
+
+class SingleStringCharacters extends ParseNode {
+	static tryMatch(src,p) {
+		let children = []
+		let f = 1;
+		while (f) {
+			let char = SingleStringCharacter.tryMatch(src,p)
+			if (!char) {
+				f = 0;
+				p.goto(p.pos-1)
+			}
+			else children.push(char)
+		}
+		if (children != []) {
+			let n = new SingleStringCharacters(children[0].start,children[children.length-1].end)
+			n.children.push(...children)
+			return n
+		}
+	}
+}
+
+class SingleStringCharacter extends ParseNode {
+	static tryMatch(src,p) {
+		let c = p.get()
+		if (!(c=='\''||c=='\\')) {
+			let n = new SingleStringCharacter(p.pos-1,p.pos);
+			return n
+		}
+	}
+}
+
 
 class IdentifierReference extends ParseNode {
 	static tryMatch(src,y,a,p) {
@@ -30,7 +272,16 @@ class IdentifierReference extends ParseNode {
 		}
 	}
 }
-
+class BindingIdentifier extends ParseNode {
+	static tryMatch(src, y, a, p) {
+		let id = Identifier.tryMatch(src, p)
+		if (id) {
+			let n = new BindingIdentifier(id.start,id.end)
+			n.children.push(id)
+			return n
+		}
+	}
+}
 class Identifier extends ParseNode {
 	static tryMatch(src, p) {
 		let idn = IdentifierName.tryMatch(src, p)
@@ -41,7 +292,6 @@ class Identifier extends ParseNode {
 		}
 	}
 }
-
 class PrimaryExpression extends ParseNode {
 	static tryMatch(src,y,a,p) {
 		let bt = p.pos;
@@ -60,7 +310,19 @@ class PrimaryExpression extends ParseNode {
 		p.goto(bt)
 	}
 }
-
+class Literal extends ParseNode {
+	static tryMatch(src, p) {
+		let bt=p.pos
+		let s = StringLiteral.tryMatch(src,p)
+		if (!s) {
+			p.goto(bt)
+			s = NumericLiteral.tryMatch(src,p)
+		}
+		if (s) {
+			return new Literal(s.start, s.end, [s])
+		}
+	}
+}
 class Script extends ParseNode{
 	static tryMatch(src, p) {
 		let body = ScriptBody.tryMatch(src, p)
@@ -450,272 +712,15 @@ class MemberExpression extends ParseNode {
 	}
 }
 
-class Literal extends ParseNode {
-	static tryMatch(src, p) {
-		let bt=p.pos
-		let s = StringLiteral.tryMatch(src,p)
-		if (!s) {
-			p.goto(bt)
-			s = NumericLiteral.tryMatch(src,p)
-		}
-		if (s) {
-			return new Literal(s.start, s.end, [s])
-		}
-	}
-}
 
-class StringLiteral extends ParseNode {
-	static tryMatch(src,p) {
-		let bt = p.pos;
-		let type = p.get()
-		
-		if (type=='"') {
 
-		}
-		if (type=='\'') {
-			let str = SingleStringCharacters.tryMatch(src,p)
-			if (p.get()=='\'') {
-				let n = new StringLiteral(bt, p.pos)
-				if (str) n.children.push(str);
-				return n
-			}
-		}
-	}
-}
 
-class SingleStringCharacters extends ParseNode {
-	static tryMatch(src,p) {
-		let children = []
-		let f = 1;
-		while (f) {
-			let char = SingleStringCharacter.tryMatch(src,p)
-			if (!char) {
-				f = 0;
-				p.goto(p.pos-1)
-			}
-			else children.push(char)
-		}
-		if (children != []) {
-			let n = new SingleStringCharacters(children[0].start,children[children.length-1].end)
-			n.children.push(...children)
-			return n
-		}
-	}
-}
-class NumericLiteral extends ParseNode {
-	static tryMatch(src,p) {
-		let n = DecimalLiteral.tryMatch(src,p);
-		if (n) return new NumericLiteral(n.start,n.end,[n]);
-	}
-}
-class DecimalLiteral extends ParseNode {
-	static tryMatch(src,p) {
-		let n = DecimalIntegerLiteral.tryMatch(src,p);
-		if (n) return new DecimalLiteral(n.start,n.end,[n]);
-	}
-}
-class DecimalIntegerLiteral extends ParseNode {
-	static tryMatch(src,p) {
-		p.consumews();
-		if (p.test('0')) return new DecimalIntegerLiteral(p.pos-1,p.pos)
-		else {
-			let n = [];
-			let a = NonZeroDigit.tryMatch(src,p);
-			if (!a) return
-			return new DecimalIntegerLiteral(p.pos-1,p.pos,[a])
-		}
-	}
-}
-class NonZeroDigit extends ParseNode{
-	static tryMatch(src,p) {
-		let bt = p.pos
-		let n =  p.get()
-		if (/[1-9]/.test(n)) return new NonZeroDigit(bt,p.pos)
-	}
-}
-class DecimalDigits extends ParseNode {
-	static tryMatch(src,p) {
-		let f = 1
-		let d = []
-		while (f) {
-			let a = DecimalDigit.tryMatch(src,p)
-			if (!a) {
-				f=0
-				return new DecimalDigits(d[0].start,d[d.length-1].end,d)
-			}
-			d.push(a)
-		}
-	}
-}
-class DecimalDigit extends ParseNode {
-	static tryMatch(src,p) {
-		let bt = p.pos
-		let n =  p.get()
-		if (/[1234567890]/.test(n)) return new DecimalDigit(bt,p.pos)		
-	}
-}
-class SingleStringCharacter extends ParseNode {
-	static tryMatch(src,p) {
-		let c = p.get()
-		if (!(c=='\''||c=='\\')) {
-			let n = new SingleStringCharacter(p.pos-1,p.pos);
-			return n
-		}
-	}
-}
 
-class BindingIdentifier extends ParseNode {
-	static tryMatch(src, y, a, p) {
-		let id = Identifier.tryMatch(src, p)
-		if (id) {
-			let n = new BindingIdentifier(id.start,id.end)
-			n.children.push(id)
-			return n
-		}
-	}
-}
 
-class IdentifierName extends ParseNode {
-	static tryMatch(src, p) {
-		let bt = p.pos;
-		let s = IdentifierStart.tryMatch(src,p)
-		if (!s) return undefined
-		let children = []
-		children.push(s)
-		let loopflag = 1
-		while(loopflag) {
-			let c = IdentifierPart.tryMatch(src, p)
-			if (!c) {
-				p.goto(p.pos-1);
-				loopflag=0;
-				break;
-			}
-			children.push(c)
-		}
-		let bt2 = p.pos;
-		p.goto(bt)
-		if (ReservedWord.tryMatch(src,p)) {
-			p.goto(bt)
-			return undefined
-		}
-		p.goto(bt2)
-		let n = new IdentifierName(bt,p.pos)
-		n.children.push(...children)
-		return n
-	}
-}
 
-class ReservedWord extends ParseNode {
-	static tryMatch(src, p) {
-		let bt = p.pos;
-		let flag = false;
-		let found = '';
-		let c = '';
-		c = p.get();
-		switch (c) {
-			case 'a':
-				if (p.test('wait')) {
-					found = 'await';
-					flag = true
-				}
-				else p.goto(bt)
-				break
-			case 'b':
-				if (p.test('reak')) {
-					found = 'break';
-					flag = true
-				}
-				else p.goto(bt)
-				break
-			case 'c':
-				c = p.get()
-				break
-			case 'd':
-				c = p.get()
-				break
-			case 'e':
-				c = p.get()
-				break
-			case 'f':
-				c = p.get()
-				break
-			case 'i':
-				c = p.get()
-				break
-			case 'n':
-				c = p.get()
-				break
-			case 'r':
-				if (p.test('eturn')) {
-					found = 'return';
-					flag = true
-				}
-				else p.goto(bt)
-				break
-			case 's':
-				c = p.get()
-				break
-			case 't':
-				c = p.get()
-				break
-			case 'v':
-				c = p.get()
-				break
-			case 'w':
-				c = p.get()
-				break
-			case 'y':
-				if (p.test('ield')) {
-					found = 'yield';
-					flag = true
-				}
-				else p.goto(bt)
-				break
-			default:
-				p.goto(bt)
-				break
-		}
-		if (flag) return new ReservedWord(bt, p.pos);
-	}
-}
-class IdentifierStart extends ParseNode {
-	static tryMatch(src, p) {
-		let s = UnicodeIDStart.tryMatch(src,p)
-		if (!s) return undefined
-		let n = new IdentifierStart(p.pos-1,p.pos)
-		n.children.push(s)
-		return n
-	}	
-}
 
-class IdentifierPart extends ParseNode {
-	static tryMatch(src, p) {
-		let s  = UnicodeIDContinue.tryMatch(src, p)
-		if (!s) return undefined
-		let n = new IdentifierPart(p.pos-1,p.pos)
-		n.children.push(s)
-		return n
-	}
-}
 
-class UnicodeIDStart extends ParseNode {
-	static tryMatch(src, p) {
-		let a = p.get();
-		if (/[\p{L}\p{Nl}]/u.test(a)) {
-			return new UnicodeIDStart(p.pos-1, p.pos)
-		}
-	}
-}
 
-class UnicodeIDContinue extends ParseNode {
-	static tryMatch(src, p) {
-		let a = p.get();
-		if (/[\p{L}\p{Nl}\p{Mn}\p{Mc}\p{Nd}\p{Pc}]/u.test(a)) {
-			return new UnicodeIDContinue(p.pos-1, p.pos)
-		}
-		return undefined
-	}
-}
 
 class Statement extends ParseNode {
 	static tryMatch(src,y,a,r,p) {
@@ -986,7 +991,7 @@ let source = `let a = 0;
 let b = 1;
 let c = a + b;`
 let src = source
-dbg = 1
+dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
 //console.dir(s, {depth:null})
