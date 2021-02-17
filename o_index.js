@@ -1,5 +1,19 @@
 class ParseNode {
+    static parser = null;
 
+    children = [];
+    start = 0;
+    end = 0;
+    
+    constructor(start, end, children = []) {
+        this.start = start;
+        this.end = end;
+        this.children = children;
+    }
+
+    static tryMatch() {
+        return undefined;
+    }
 }
 
 class SourceCharacter extends ParseNode {}
@@ -269,7 +283,7 @@ class ExportFromClause extends ParseNode {}
 class NamedExports extends ParseNode {}
 class ExportsList extends ParseNode {}
 class ExportSpecifier extends ParseNode {}
-class StrNumericLiteral extends ParseNode {}
+class StringNumericLiteral extends ParseNode {}
 class StrWhiteSpace extends ParseNode {}
 class StrWhiteSpaceChar extends ParseNode {}
 class StrNumericLiteral extends ParseNode {}
@@ -325,14 +339,78 @@ class ClassEscape extends ParseNode {}
 
 function ScriptRecord() {
 	let record = {};
-	record.Realm = undefined
-	record.Environment = undefined
-	record.ECMAScriptCode = undefined
+	record.Realm = undefined;
+	record.Environment = undefined;
+	record.ECMAScriptCode = undefined;
 	record.HostDefined = undefined;
-	return record
+	return record;
 }
 
-class Parser {}
+class Parser {
+    static goto;
+    static peek;
+    static get;
+    static consumews;
+    static test;
+
+    src = '';
+    pos = 0;
+
+    constructor() {
+        Parser.goto = this.goto.bind(this);
+        Parser.peek = this.peek.bind(this);
+        Parser.get  = this.get.bind(this);
+        Parser.consumews = this.consumews.bind(this);
+        Parser.test = this.test.bind(this);
+    }
+
+    goto(pos) {
+        this.pos = pos;
+    }
+
+    peek(dist = 1) {
+        return this.src.charAt(this.pos+dist);
+    }
+
+    get() {
+        let c = this.stc.charAt(this.pos);
+        this.pos++;
+        return c;
+    }
+
+    consumews(includelb = true) {
+        let f = true;
+        while (f) {
+            let bt = this.pos;
+            let c = this.get();
+            let g = false;
+            if (includelb) {if (c == '\n') g=true;}
+            if (c != ' ' && c != '\t' && !g) {
+                f = false;
+                this.goto(bt);
+            }
+        }
+    }
+
+    test(str, consumeIfTrue = true) {
+        let len = str.length;
+        for (let i = 0; i < len; i++) {
+            let c = this.peek(i);
+            if (c != str.charAt(i)) return false
+        }
+        if (consumeIfTrue) this.goto(this.pos + len);
+        return true
+    }
+
+    ParseScript(sourceText) {
+        this.src = sourceText;
+        this.pos = 0;
+        let parsed = Script.tryMatch()
+        let record = new ScriptRecord()
+        record.ECMAScriptCode = parsed
+        return record;
+    }
+}
 
 let source = `let a = 0;
 let b = 1;
