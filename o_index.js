@@ -1,3 +1,7 @@
+class ParseNode {
+
+}
+
 class SourceCharacter extends ParseNode {}
 class InputElementDiv extends ParseNode {}
 class InputElementRegExp extends ParseNode {}
@@ -318,3 +322,21 @@ class NonEmptyClassRangesNoDash extends ParseNode {}
 class ClassAtom extends ParseNode {}
 class ClassAtomNoDash extends ParseNode {}
 class ClassEscape extends ParseNode {}
+
+function ScriptRecord() {
+	let record = {};
+	record.Realm = undefined
+	record.Environment = undefined
+	record.ECMAScriptCode = undefined
+	record.HostDefined = undefined;
+	return record
+}
+
+class Parser {}
+
+let source = `let a = 0;
+let b = 1;
+let c = a + b;`
+dbg = 0
+let a = new Parser()
+let s = a.ParseScript(source)
