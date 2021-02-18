@@ -1,10 +1,14 @@
 class ParseNode {
-    static parser = null;
-
     children = [];
     start = 0;
     end = 0;
     
+    /**
+     * The generic Parse Node constructor.
+     * @param {Number} start 
+     * @param {Number} end 
+     * @param {ParseNode[]} children 
+     */
     constructor(start, end, children = []) {
         this.start = start;
         this.end = end;
@@ -34,24 +38,133 @@ class SingleLineComment extends ParseNode {}
 class SingleLineCommentChars extends ParseNode {}
 class SingleLineCommentChar extends ParseNode {}
 class CommonToken extends ParseNode {}
-class IdentifierName extends ParseNode {}
-class IdentifierStart extends ParseNode {}
-class IdentifierPart extends ParseNode {}
-class UnicodeIDStart extends ParseNode {}
-class UnicodeIDContinue extends ParseNode {}
+
+class IdentifierName extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let s = IdentifierStart.tryMatch();
+        if (!s) return
+        let children = []
+        children.push(s)
+        while (true) {
+            let bt = Parser.pos
+            let c = IdentifierPart.tryMatch()
+            if (!c) {
+                Parser.goto(bt)
+                break;
+            }
+            children.push(c)
+        }
+        return new IdentifierName(bt,Parser.pos,children)
+    }
+}
+
+class IdentifierStart extends ParseNode {
+    static tryMatch() {
+        let s = UnicodeIDStart.tryMatch()
+        if (!s) return
+        return new IdentifierStart(Parser.pos-1,Parser.pos,[s])
+    }
+}
+
+class IdentifierPart extends ParseNode {
+
+}
+
+class UnicodeIDStart extends ParseNode {
+    static tryMatch() {
+        let a = Parser.get()
+        if (/[\p{L}\p{Nl}]/u.test(a)) return new UnicodeIDStart(Parser.pos-1, Parser.pos)
+        Parser.goto(Parser.pos-1)
+    }
+}
+
+class UnicodeIDContinue extends ParseNode {
+
+}
+
 class ReservedWord extends ParseNode {}
 class Punctuator extends ParseNode {}
 class OptionalChainingPunctuator extends ParseNode {}
 class OtherPunctuator extends ParseNode {}
 class DivPunctuator extends ParseNode {}
 class RightBracePunctuator extends ParseNode {}
-class NullLiteral extends ParseNode {}
-class BooleanLiteral extends ParseNode {}
-class NumericLiteral extends ParseNode {}
-class DecimalBigIntegerLiteral extends ParseNode {}
+class NullLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (Parser.test('null')) return new NullLiteral(bt,Parser.pos)
+    }
+}
+class BooleanLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (Parser.test('true')) {}
+        else if (Parser.test('false')) {}
+        else {return}
+        return new BooleanLiteral(bt,Parser.pos)
+    }
+}
+class NumericLiteral extends ParseNode {
+    static tryMatch() {
+        let c;
+        if (c=DecimalLiteral.tryMatch()) {}
+        else if (c=DecimalBigIntegerLiteral.tryMatch()) {}
+        else if (c=NonDecimalIntegerLiteral.tryMatch()) {
+            let d
+            if (d=BigIntLiteralSuffix.tryMatch()) {
+                return new NumericLiteral(c.start,d.end,[c,d])
+            }
+        }
+        else {return}
+        return new NumericLiteral(c.start,c.end,[c])
+    }
+}
+class DecimalBigIntegerLiteral extends ParseNode {
+    static tryMatch() {
+        let c;
+        if (Parser.test('0')) {
+            
+        }
+    }
+}
 class NonDecimalIntegerLiteral extends ParseNode {}
 class BigIntLiteralSuffix extends ParseNode {}
-class DecimalLiteral extends ParseNode {}
+class DecimalLiteral extends ParseNode {
+    static tryMatch() {
+        let c;
+        if (c=DecimalIntegerLiteral.tryMatch()) {
+            let d;
+            if (Parser.test('.')) {
+                if (d=DecimalDigits.tryMatch()) {
+                    let e;
+                    if (e=ExponentPart.tryMatch()) {
+                        return new DecimalLiteral(c.start,e.end,[c,d,e])
+                    }
+                    else return new DecimalLiteral(c.start,d.end,[c,d])
+                }
+                else return new DecimalLiteral(c.start,c.end+1,[c])
+            }
+            else if (d=ExponentPart.tryMatch()) {
+                return new DecimalLiteral(c.start,d.end,[c,d])
+            }
+            else return new DecimalLiteral(c.start,c.end,[c])
+        }
+        else if (Parser.test('.')) {
+            let d;
+            if (d=DecimalDigits.tryMatch()) {
+                let e;
+                if (e=ExponentPart.tryMatch()) {
+                    return new DecimalLiteral(c.start,e.end,[c,d,e])
+                }
+                return new DecimalLiteral(c.start,d.end,[c,d])
+            }
+        }
+        // No need for another block, despite the third production.
+        // We can keep it grouped with the first, because if DecimalIntegerLiteral matches
+        // test('.') WILL fail B)
+        else return
+    }
+}
 class DecimalIntegerLiteral extends ParseNode {}
 class DecimalDigits extends ParseNode {}
 class DecimalDigit extends ParseNode {}
@@ -105,13 +218,54 @@ class NotEscapeSequence extends ParseNode {}
 class NotCodePoint extends ParseNode {}
 class CodePoint extends ParseNode {}
 class IdentifierReference extends ParseNode {}
-class BindingIdentifier extends ParseNode {}
+
+class BindingIdentifier extends ParseNode {
+    static tryMatch(y,a) {
+        let n = Identifier.tryMatch();
+        if (n) return new BindingIdentifier(n.start,n.end,[n])
+        // XXX: we need the yield and await stuff. stop cutting corners something is gonna break
+    }
+}
+
 class LabelIdentifier extends ParseNode {}
-class Identifier extends ParseNode {}
-class PrimaryExpression extends ParseNode {}
+
+class Identifier extends ParseNode {
+    static tryMatch() {
+        let r = IdentifierName.tryMatch()
+        // XXX: What did I say.
+        if (r) return new Identifier(r.start,r.end,[r])
+    }
+}
+
+class PrimaryExpression extends ParseNode {
+    static tryMatch(y,a) {
+        console.log('p')
+        let c
+        if (Parser.test('this')) {
+            
+        }
+        else if (c=IdentifierReference.tryMatch(y,a)) {
+            console.log('a')
+        }
+        else if (c=Literal.tryMatch()) {
+            console.log('l')
+        }
+    }
+}
+
 class CoverParenthesizedExpressionAndArrowParameterList extends ParseNode {}
 class ParenthesizedExpression extends ParseNode {}
-class Literal extends ParseNode {}
+class Literal extends ParseNode {
+    static tryMatch() {
+        let c
+        if (c=NullLiteral.tryMatch()) {}
+        else if (c=BooleanLiteral.tryMatch()) {}
+        else if (c=NumericLiteral.tryMatch()) {}
+        else if (c=StringLiteral.tryMatch()) {}
+        else {return} //hehe. that's right.
+        return new Literal(c.start,c.end,[c])
+    }
+}
 class ArrayLiteral extends ParseNode {}
 class ElementList extends ParseNode {}
 class Elison extends ParseNode {}
@@ -123,43 +277,173 @@ class PropertyName extends ParseNode {}
 class LiteralPropertyName extends ParseNode {}
 class ComputedPropertyName extends ParseNode {}
 class CoverInitializedName extends ParseNode {}
-class Initializer extends ParseNode {}
+
+class Initializer extends ParseNode {
+    static tryMatch(i,y,a) {
+        Parser.consumews()
+        let bt = Parser.pos
+        if (Parser.test('=')) {
+            let e = AssignmentExpression.tryMatch(i,y,a)
+            if (e) return new AssignmentExpression(bt,e.end,[e])
+        }
+        
+    }
+}
+
 class TemplateLiteral extends ParseNode {}
 class SubstitutionTemplate extends ParseNode {}
 class TemplateSpans extends ParseNode {}
 class TemplateMiddleList extends ParseNode {}
-class MemberExpression extends ParseNode {}
+class MemberExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = PrimaryExpression.tryMatch(y,a)
+        if (c) return new MemberExpression(c.start,c.end,c)
+    }
+}
 class SuperProperty extends ParseNode {}
 class MetaProperty extends ParseNode {}
 class NewTarget extends ParseNode {}
 class ImportMeta extends ParseNode {}
-class NewExpression extends ParseNode {}
+class NewExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = MemberExpression.tryMatch(y,a)
+        if (c) return new NewExpression(c.start,c.end,[c])
+    }
+}
 class CallExpression extends ParseNode {}
 class CallMemberExpression extends ParseNode {}
 class SuperCall extends ParseNode {}
 class ImportCall extends ParseNode {}
 class Arguments extends ParseNode {}
 class ArgumentList extends ParseNode {}
+
 class OptionalExpression extends ParseNode {}
-class LeftHandSideExpression extends ParseNode {}
-class UpdateExpression extends ParseNode {}
-class UnaryExpression extends ParseNode {}
-class ExponentiationExpression extends ParseNode {}
-class MultiplicativeExpression extends ParseNode {}
-class MultiplicativeOperator extends ParseNode {}
-class AdditiveExpression extends ParseNode {}
-class ShiftExpression extends ParseNode {}
-class RelationalExpression extends ParseNode {}
-class EqualityExpression extends ParseNode {}
-class BitwiseANDExpression extends ParseNode {}
-class BitwiseXORExpression extends ParseNode {}
-class BitwiseORExpression extends ParseNode {}
-class LogicalANDExpression extends ParseNode {}
-class LogicalORExpression extends ParseNode {}
+
+class LeftHandSideExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = NewExpression.tryMatch(y,a)
+        if (c) return new LeftHandSideExpression(c.start,c.end,[c])
+    }
+}
+
+class UpdateExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = LeftHandSideExpression.tryMatch(y,a)
+        if (c) return new UpdateExpression(c.start,c.end,[c])
+    }
+}
+
+class UnaryExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = UpdateExpression.tryMatch(y,a)
+        if (c) return new UnaryExpression(c.start,c.end,[c])
+    }
+}
+
+class ExponentiationExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = UnaryExpression.tryMatch(y,a)
+        if (c) return new ExponentiationExpression(c.start,c.end,[c])
+    }
+}
+
+class MultiplicativeExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = ExponentiationExpression.tryMatch(y,a)
+        if (c) return new MultiplicativeExpression(c.start,c.end,[c])
+    }
+}
+
+class MultiplicativeOperator extends ParseNode {
+    static tryMatch() {
+
+    }
+}
+
+class AdditiveExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = MultiplicativeExpression.tryMatch(y,a)
+        if (c) return new AdditiveExpression(c.start,c.end,[c])
+    }
+}
+
+class ShiftExpression extends ParseNode {
+    static tryMatch(y,a) {
+        let c = AdditiveExpression.tryMatch(y,a)
+        if (c) return new ShiftExpression(c.start,c.end,[c])
+    }
+}
+
+class RelationalExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = ShiftExpression.tryMatch(y,a)
+        if (c) return new RelationalExpression(c.start,c.end,[c])
+    }
+}
+
+class EqualityExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = RelationalExpression.tryMatch(i,y,a)
+        if (c) return new EqualityExpression(c.start,c.end,[c])
+    }
+}
+
+class BitwiseANDExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = EqualityExpression.tryMatch(i,y,a)
+        if (c) return new BitwiseANDExpression(c.start,c.end,[c])
+    }
+}
+
+class BitwiseXORExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = BitwiseANDExpression.tryMatch(i,y,a)
+        if (c) return new BitwiseXORExpression(c.start,c.end,[c])
+    }
+}
+
+class BitwiseORExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = BitwiseXORExpression.tryMatch(i,y,a)
+        if (c) return new BitwiseORExpression(c.start,c.end,[c])
+    }
+}
+
+class LogicalANDExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = BitwiseORExpression.tryMatch(i,y,a)
+        if (c) return new LogicalANDExpression(c.start,c.end,[c])
+    }
+}
+
+class LogicalORExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = LogicalANDExpression.tryMatch(i,y,a)
+        if (c) return new LogicalORExpression(c.start,c.end,[c])
+    }
+}
 class CoalesceExpression extends ParseNode {}
 class CoalesceExpressionHead extends ParseNode {}
-class ConditionalExpression extends ParseNode {}
-class AssignmentExpression extends ParseNode {}
+class ShortCircuitExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = LogicalORExpression.tryMatch(i,y,a)
+        if (!c) c = CoalesceExpression.tryMatch(i,y,a)
+        if (c) return new ShortCircuitExpression(c.start,c.end,[c])
+    }
+}
+class ConditionalExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = ShortCircuitExpression.tryMatch(i,y,a)
+        if (c) return new ConditionalExpression(i,y,a)
+    }
+}
+
+class AssignmentExpression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let c = ConditionalExpression.tryMatch(i,y,a)
+        if (c) return new AssignmentExpression(c.start,c.end,[c])
+    }
+}
 class AssignmentOperator extends ParseNode {}
 class AssignmentPattern extends ParseNode {}
 class ObjectAssignmentPattern extends ParseNode {}
@@ -173,18 +457,109 @@ class AssignmentElement extends ParseNode {}
 class AssignmentRestElement extends ParseNode {}
 class DestructuringAssignmentTarget extends ParseNode {}
 class Expression extends ParseNode {}
-class Statement extends ParseNode {}
-class Declaration extends ParseNode {}
+
+class Statement extends ParseNode {
+    
+}
+
+class Declaration extends ParseNode {
+    static tryMatch(y,a) {
+        let d = HoistableDeclaration.tryMatch(y,a,0);
+        if (!d) d = ClassDeclaration.tryMatch(y,a,0);
+        if (!d) d = LexicalDeclaration.tryMatch(1,y,a);
+        if (d) return new Declaration(d.start,d.end,[d])
+    }
+}
+
 class HoistableDeclaration extends ParseNode {}
 class BreakableStatement extends ParseNode {}
 class BlockStatement extends ParseNode {}
 class Block extends ParseNode {}
-class StatementList extends ParseNode {}
-class StatementListItem extends ParseNode {}
-class LexicalDeclaration extends ParseNode {}
-class LetOrConst extends ParseNode {}
-class BindingList extends ParseNode {}
-class LexicalBinding extends ParseNode {}
+
+class StatementList extends ParseNode {
+    static tryMatch(y, a, r) {
+        let items = []
+        while (true) {
+            Parser.consumews(true)
+            let item = StatementListItem.tryMatch(y,a,r)
+            if (item) items.push(item)
+            else break;
+        }
+        if (items.length>0) return new StatementList(items[0].start, items[0].end, items)
+    }
+}
+
+class StatementListItem extends ParseNode {
+    static tryMatch(y,a,r) {
+        let d = Declaration.tryMatch(y,a);
+        if (!d) d = Statement.tryMatch(y,a,r)
+        if (d) return new StatementListItem(d.start,d.end,[d])
+    }
+}
+
+class LexicalDeclaration extends ParseNode {
+    static tryMatch(i,y,a) {
+        let lc = LetOrConst.tryMatch()
+        if (!lc) return
+        if (Parser.test(' ')) {
+            Parser.consumews();
+            let bindings = BindingList.tryMatch(i,y,a);
+            if (bindings) {
+                Parser.consumews();
+                if (Parser.test(';')) return new LexicalDeclaration(lc.start, Parser.pos, [lc, bindings])
+            }
+        }
+    }
+}
+
+class LetOrConst extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (Parser.test('let')) return new LetOrConst(bt, Parser.pos)
+        else if (Parser.test('const')) return new LetOrConst(bt, Parser.pos)
+    }
+}
+
+class BindingList extends ParseNode {
+    static tryMatch(i,y,a) {
+        let bindings = []
+        let n = LexicalBinding.tryMatch(i,y,a)
+        if (n) bindings.push(n)
+        else return 
+        while (true) {
+            Parser.consumews()
+            if (!Parser.test(',')) break
+            let n = LexicalBinding.tryMatch(i,y,a)
+            if (n) bindings.push(n)
+            else break;
+        }
+        if (bindings.length > 0) return new BindingList(bindings[0].start,bindings[bindings.length-1].end,bindings)
+    }
+}
+
+class LexicalBinding extends ParseNode {
+    static tryMatch(i,y,a) {
+        let back = Parser.pos;
+        Parser.consumews()
+        let id = BindingIdentifier.tryMatch(y,a)
+        if (id) {
+            let init = Initializer.tryMatch(i,y,a)
+            if (init) return new LexicalBinding(id.start, init.end, [id, init])
+            else return new LexicalBinding(id.start,id.end,[id])
+        }
+        // looks like we failed. lets try another production
+        Parser.goto(back)
+        Parser.consumews()
+        id = BindingPattern.tryMatch(y,a)
+        if (id) {
+            let init = Initializer.tryMatch(i,y,a)
+            if (init) return new LexicalBinding(id.start, init.end, [id, init])
+        }
+        // yeah we failed.
+        Parser.goto(back)
+    }
+}
+
 class VariableStatement extends ParseNode {}
 class VariableDeclarationList extends ParseNode {}
 class VariableDeclaration extends ParseNode {}
@@ -263,8 +638,22 @@ class ClassHeritage extends ParseNode {}
 class ClassBody extends ParseNode {}
 class ClassElementList extends ParseNode {}
 class ClassElement extends ParseNode {}
-class Script extends ParseNode {}
-class ScriptBody extends ParseNode {}
+
+class Script extends ParseNode {
+    static tryMatch() {
+        let body = ScriptBody.tryMatch()
+        if (body) return new Script(body.start,body.end,[body])
+        else return new Script(0,0)
+    }
+}
+
+class ScriptBody extends ParseNode {
+    static tryMatch() {
+        let statements = StatementList.tryMatch(0,0,0);
+        if (statements) return new ScriptBody(statements.start, statements.end, [statements])
+    }
+}
+
 class Module extends ParseNode {}
 class ModuleBody extends ParseNode {}
 class ModuleItemList extends ParseNode {}
@@ -362,6 +751,16 @@ class Parser {
         Parser.get  = this.get.bind(this);
         Parser.consumews = this.consumews.bind(this);
         Parser.test = this.test.bind(this);
+        Object.defineProperty(Parser, 'src', {
+            get: (() => {
+                return this.src;
+            }).bind(this)
+        })
+        Object.defineProperty(Parser, 'pos', {
+            get: (() => {
+                return this.pos;
+            }).bind(this)
+        })
     }
 
     goto(pos) {
@@ -373,7 +772,7 @@ class Parser {
     }
 
     get() {
-        let c = this.stc.charAt(this.pos);
+        let c = this.src.charAt(this.pos);
         this.pos++;
         return c;
     }
@@ -412,9 +811,11 @@ class Parser {
     }
 }
 
-let source = `let a = 0;
+let source = `let a;
 let b = 1;
+a = 1;
 let c = a + b;`
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
+console.log(s.ECMAScriptCode)
