@@ -1063,7 +1063,10 @@ let e = 1.0;
 let f = 1e+1;
 let g = 0b1;
 let h = 0o1;
-let i = 0x1;`
+let i = 0x1;
+
+let j = "Hello World!";
+let k = 'pog.';`
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
