@@ -405,10 +405,30 @@ class StringLiteral extends ParseNode {
         }
     }
 }
-class DoubleStringCharacters extends ParseNode {}
-class SingleStringCharacters extends ParseNode {}
-class SingleStringCharacter extends ParseNode {}
-class DoubleStringCharacter extends ParseNode {}
+class DoubleStringCharacters extends ParseNode {
+    static tryMatch() {
+        let c = []
+        while (true) {
+            let d
+            if (d=DoubleStringCharacter.tryMatch()) c.push(d)
+            else break;
+        }
+        if (c.length>0) return new DoubleStringCharacters(c[0].start,Parser.pos,c)
+    }
+}
+class SingleStringCharacters extends ParseNode {
+
+}
+
+class SingleStringCharacter extends ParseNode {
+    
+}
+class DoubleStringCharacter extends ParseNode {
+    static tryMatch() {
+        if (!Parser.test('"',false)) {return}
+        else {Parser.goto(Parser.pos+1);return new DoubleStringCharacter(Parser.pos-1,Parser.pos)}
+    }
+}
 class LineContinuaton extends ParseNode {}
 class EscapeSequence extends ParseNode {}
 class CharacterEscapeSequence extends ParseNode {}
