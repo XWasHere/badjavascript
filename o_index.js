@@ -107,28 +107,64 @@ class BooleanLiteral extends ParseNode {
 class NumericLiteral extends ParseNode {
     static tryMatch() {
         let c;
-        if (c=DecimalLiteral.tryMatch()) {}
-        else if (c=DecimalBigIntegerLiteral.tryMatch()) {}
+        if  (c=DecimalBigIntegerLiteral.tryMatch()) {}
         else if (c=NonDecimalIntegerLiteral.tryMatch()) {
             let d
             if (d=BigIntLiteralSuffix.tryMatch()) {
                 return new NumericLiteral(c.start,d.end,[c,d])
             }
         }
+        else if (c=DecimalLiteral.tryMatch()) {}
         else {return}
         return new NumericLiteral(c.start,c.end,[c])
     }
 }
 class DecimalBigIntegerLiteral extends ParseNode {
     static tryMatch() {
-        let c;
-        if (Parser.test('0')) {
-            
+        let c = [];
+        let d
+        let bt = Parser.pos;
+        if (Parser.test('0')) {}
+        else if (d=NonZeroDigit.tryMatch()) {
+            c.push(d)
+            let e;
+            if (e = DecimalDigits.tryMatch()) {
+                c.push(e)
+            }
+        }
+        else {
+            Parser.goto(bt)
+            return
+        }
+        let e;
+        if (e=BigIntLiteralSuffix.tryMatch()) {
+            c.push(e)
+            return new DecimalBigIntegerLiteral(bt,e.end,c)
+        }
+        else {
+            Parser.goto(bt)
+            return
         }
     }
 }
-class NonDecimalIntegerLiteral extends ParseNode {}
-class BigIntLiteralSuffix extends ParseNode {}
+class NonDecimalIntegerLiteral extends ParseNode {
+    static tryMatch() {
+        let c;
+        if (c=BinaryIntegerLiteral.tryMatch()) {}
+        else if (c=OctalIntegerLiteral.tryMatch()) {}
+        else if (c=HexIntegerLiteral.tryMatch()) {}
+        else return
+        return new NonDecimalIntegerLiteral(c.start,c.end,[c])
+    }
+}
+
+class BigIntLiteralSuffix extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (Parser.test('n')) return new BigIntLiteralSuffix(bt,Parser.pos)
+    }
+}
+
 class DecimalLiteral extends ParseNode {
     static tryMatch() {
         let c;
@@ -165,22 +201,192 @@ class DecimalLiteral extends ParseNode {
         else return
     }
 }
-class DecimalIntegerLiteral extends ParseNode {}
-class DecimalDigits extends ParseNode {}
-class DecimalDigit extends ParseNode {}
-class NonZeroDigit extends ParseNode {}
-class ExponentPart extends ParseNode {}
-class ExponentIndicator extends ParseNode {}
-class SignedInteger extends ParseNode {}
-class BinaryIntegerLiteral extends ParseNode {}
-class BinaryDigits extends ParseNode {}
-class BinaryDigit extends ParseNode {}
-class OctalIntegerLiteral extends ParseNode {}
-class OctalDigits extends ParseNode {}
-class OctalDigit extends ParseNode {}
-class HexIntegerLiteral extends ParseNode {}
-class HexDigits extends ParseNode {}
-class HexDigit extends ParseNode {}
+
+class DecimalIntegerLiteral extends ParseNode {
+    static tryMatch() {
+        if (Parser.test('0')) return new DecimalIntegerLiteral(Parser.pos-1,Parser.pos)
+        let c;
+        if (c=NonZeroDigit.tryMatch()) {
+            let d;
+            if (d=DecimalDigits.tryMatch()) {
+                return new DecimalIntegerLiteral(c.start,d.end,[c,d])
+            }
+            else return new DecimalIntegerLiteral(c.start,c.end,[c])
+        }
+    }
+}
+
+class DecimalDigits extends ParseNode {
+    static tryMatch() {
+        let c = []
+        let d = 0
+        while (true) {
+            let e = DecimalDigit.tryMatch()
+            if (e) {
+                c.push(e)
+                d = 1
+            }
+            else break
+        }
+        if (d) return new DecimalDigits(c[0].start,Parser.pos,c)
+    }
+}
+
+class DecimalDigit extends ParseNode {
+    static tryMatch() {
+        let a = Parser.get()
+        if (/[0-9]/.test(a)) return new DecimalDigit(Parser.pos-1,Parser.pos)
+        else {
+            Parser.goto(Parser.pos-1)
+        }
+    }
+}
+
+class NonZeroDigit extends ParseNode {
+    static tryMatch() {
+        let a = Parser.get()
+        if (/[1-9]/.test(a)) return new NonZeroDigit(Parser.pos-1,Parser.pos)
+        else {
+            Parser.goto(Parser.pos-1)
+        }
+    }
+}
+
+class ExponentPart extends ParseNode {
+    static tryMatch() {
+        let c;
+        let d;
+        if (c=ExponentIndicator.tryMatch()) {
+            if (d=SignedInteger.tryMatch()) {
+                return new ExponentPart(c.start,d.end,[c,d])
+            }
+        }
+    }
+}
+
+class ExponentIndicator extends ParseNode {
+    static tryMatch() {
+        let c = 0
+        if (Parser.test('e')) {}
+        else if (Parser.test('E')) {}
+        else {return}
+        return new ExponentIndicator(Parser.pos-1,Parser.pos)
+    }
+}
+
+class SignedInteger extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (Parser.test('+')) {}
+        else if (Parser.test('-')) {}
+        let c;
+        if (c=DecimalDigits.tryMatch()) return new SignedInteger(bt,c.end,[c])
+        else {
+            Parser.goto(bt)
+        }
+    }
+}
+
+class BinaryIntegerLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (!Parser.test('0')) {Parser.goto(bt);return}
+        if (Parser.test('b')) {}
+        else if (Parser.test("B")) {}
+        else {Parser.goto(bt);return}
+        let c;
+        if (c=BinaryDigits.tryMatch()) return new BinaryIntegerLiteral(c.start-2,c.end,[c])
+    }
+}
+class BinaryDigits extends ParseNode {
+    static tryMatch() {
+        let c = []
+        let bt = Parser.pos
+        while (1) {
+            let d;
+            if (d=BinaryDigit.tryMatch()) c.push(d)
+            else break
+        }
+        if (c.length>0) return new BinaryDigits(bt,Parser.pos,c)
+        else Parser.goto(bt)
+    }
+}
+
+class BinaryDigit extends ParseNode {
+    static tryMatch() {
+        let a = Parser.get()
+        if (/[01]/.test(a)) return new BinaryDigit(Parser.pos-1,Parser.pos)
+        else {
+            Parser.goto(Parser.pos-1)
+        }
+    }
+}
+class OctalIntegerLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (!Parser.test('0')) {Parser.goto(bt);return;}
+        if (Parser.test('o')) {}
+        else if (Parser.test("O")) {}
+        else {Parser.goto(bt);return}
+        let c;
+        if (c=OctalDigits.tryMatch()) return new OctalIntegerLiteral(c.start-2,c.end,[c])
+    }
+}
+class OctalDigits extends ParseNode {
+    static tryMatch() {
+        let c = []
+        let bt = Parser.pos
+        while (1) {
+            let d;
+            if (d=OctalDigit.tryMatch()) c.push(d)
+            else break
+        }
+        if (c.length>0) return new OctalDigits(bt,Parser.pos,c)
+        else Parser.goto(bt)
+    }
+}
+class OctalDigit extends ParseNode {
+    static tryMatch() {
+        let a = Parser.get()
+        if (/[0-7]/.test(a)) return new OctalDigit(Parser.pos-1,Parser.pos)
+        else {
+            Parser.goto(Parser.pos-1)
+        }
+    }
+}
+class HexIntegerLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (!Parser.test('0')) {Parser.goto(bt);return}
+        if (Parser.test('x')) {}
+        else if (Parser.test("X")) {}
+        else {Parser.goto(bt);return}
+        let c;
+        if (c=HexDigits.tryMatch()) return new HexIntegerLiteral(c.start-2,c.end,[c])
+    }
+}
+class HexDigits extends ParseNode {
+    static tryMatch() {
+        let c = []
+        let bt = Parser.pos
+        while (1) {
+            let d;
+            if (d=HexDigit.tryMatch()) c.push(d)
+            else break
+        }
+        if (c.length>0) return new HexDigits(bt,Parser.pos,c)
+        else Parser.goto(bt)
+    }
+}
+class HexDigit extends ParseNode {
+    static tryMatch() {
+        let a = Parser.get()
+        if (/[0-9a-fA-F]/.test(a)) return new HexDigit(Parser.pos-1,Parser.pos)
+        else {
+            Parser.goto(Parser.pos-1)
+        }
+    }
+}
 class StringLiteral extends ParseNode {}
 class DoubleStringCharacters extends ParseNode {}
 class SingleStringCharacters extends ParseNode {}
@@ -248,7 +454,7 @@ class PrimaryExpression extends ParseNode {
             console.log('a')
         }
         else if (c=Literal.tryMatch()) {
-            console.log('l')
+            return new PrimaryExpression(c.start,c.end,[c])
         }
     }
 }
@@ -283,8 +489,9 @@ class Initializer extends ParseNode {
         Parser.consumews()
         let bt = Parser.pos
         if (Parser.test('=')) {
+            Parser.consumews()
             let e = AssignmentExpression.tryMatch(i,y,a)
-            if (e) return new AssignmentExpression(bt,e.end,[e])
+            if (e) return new Initializer(bt,e.end,[e])
         }
         
     }
@@ -485,7 +692,7 @@ class StatementList extends ParseNode {
             if (item) items.push(item)
             else break;
         }
-        if (items.length>0) return new StatementList(items[0].start, items[0].end, items)
+        if (items.length>0) return new StatementList(items[0].start, items[items.length-1].end, items)
     }
 }
 
@@ -813,8 +1020,13 @@ class Parser {
 
 let source = `let a;
 let b = 1;
-a = 1;
-let c = a + b;`
+let c = 0;
+let d = 1n;
+let e = 1.0;
+let f = 1e+1;
+let g = 0b1;
+let h = 0o1;
+let i = 0x1;`
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
