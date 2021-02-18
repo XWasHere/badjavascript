@@ -417,16 +417,32 @@ class DoubleStringCharacters extends ParseNode {
     }
 }
 class SingleStringCharacters extends ParseNode {
-
+    static tryMatch() {
+        let c = []
+        while (true) {
+            let d
+            if (d=SingleStringCharacter.tryMatch()) c.push(d)
+            else break;
+        }
+        if (c.length>0) return new SingleStringCharacters(c[0].start,Parser.pos,c)
+    }
 }
 
 class SingleStringCharacter extends ParseNode {
-    
+    static tryMatch() {
+        if (!(Parser.test("'",false) || Parser.test("\\",false) || Parser.prodTest(LineTerminator))) {
+            Parser.goto(Parser.pos+1)
+            return new SingleStringCharacter(Parser.pos-1,Parser.pos)
+        }
+    }    
 }
+
 class DoubleStringCharacter extends ParseNode {
     static tryMatch() {
-        if (!Parser.test('"',false)) {return}
-        else {Parser.goto(Parser.pos+1);return new DoubleStringCharacter(Parser.pos-1,Parser.pos)}
+        if (!(Parser.test('"',false) || Parser.test("\\",false) || Parser.prodTest(LineTerminator))) {
+            Parser.goto(Parser.pos+1)
+            return new DoubleStringCharacter(Parser.pos-1,Parser.pos)
+        }
     }
 }
 class LineContinuaton extends ParseNode {}
@@ -985,6 +1001,7 @@ class Parser {
     static get;
     static consumews;
     static test;
+    static prodTest;
 
     src = '';
     pos = 0;
@@ -995,6 +1012,7 @@ class Parser {
         Parser.get  = this.get.bind(this);
         Parser.consumews = this.consumews.bind(this);
         Parser.test = this.test.bind(this);
+        Parser.prodTest = this.prodTest.bind(this)
         Object.defineProperty(Parser, 'src', {
             get: (() => {
                 return this.src;
@@ -1045,6 +1063,13 @@ class Parser {
         return true
     }
 
+    prodTest(NonTerminal, ntParams = [], consumeIfTrue = false) {
+        let bt = this.pos;
+        let t = NonTerminal.tryMatch(...ntParams);
+        if (!consumeIfTrue) this.goto(bt)
+        if (t) return true
+        else return false
+    }
     ParseScript(sourceText) {
         this.src = sourceText;
         this.pos = 0;
