@@ -387,7 +387,24 @@ class HexDigit extends ParseNode {
         }
     }
 }
-class StringLiteral extends ParseNode {}
+class StringLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        let c;
+        if (Parser.test('"')) {
+            if (c=DoubleStringCharacters.tryMatch()) {
+                if (Parser.test('"')) return new StringLiteral(bt,Parser.pos,[c])
+            }
+            else if (Parser.test('"')) return new StringLiteral(bt,Parser.pos)
+        }
+        if (Parser.test("'")) {
+            if (c=SingleStringCharacters.tryMatch()) {
+                if (Parser.test("'")) return new StringLiteral(bt,Parser.pos,[c])
+            }
+            else if (Parser.test("'")) return new StringLiteral(bt,Parser.pos)
+        }
+    }
+}
 class DoubleStringCharacters extends ParseNode {}
 class SingleStringCharacters extends ParseNode {}
 class SingleStringCharacter extends ParseNode {}
