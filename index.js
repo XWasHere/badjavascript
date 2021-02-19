@@ -538,10 +538,80 @@ class NoSubstitutionTemplate extends ParseNode {
         Parser.goto(bt)
     }
 }
-class TemplateHead extends ParseNode {}
-class TemplateSubstitutionTail extends ParseNode {}
-class TemplateMiddle extends ParseNode {}
-class TemplateTail extends ParseNode {}
+class TemplateHead extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('`')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('${')) {
+                    return new TemplateHead(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('${')) {
+                return new TemplateHead(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateSubstitutionTail extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=TemplateMiddle.tryMatch()) return new TemplateSubstitutionTail(c.start,c.end,[c])
+        if (c=TemplateTail.tryMatch()) return new TemplateSubstitutionTail(c.start,c.end,[c])
+        
+        Parser.goto(bt);
+    }
+}
+class TemplateMiddle extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('}')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('${')) {
+                    return new TemplateMiddle(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('${')) {
+                return new TemplateMiddle(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateTail extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('}')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('`')) {
+                    return new TemplateTail(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('`')) {
+                return new TemplateTail(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
 class TemplateCharacters extends ParseNode {}
 class TemplateCharacter extends ParseNode {}
 class NotEscapeSequence extends ParseNode {}
