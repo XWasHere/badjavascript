@@ -631,7 +631,55 @@ class TemplateCharacters extends ParseNode {
         Parser.goto(bt)
     }
 }
-class TemplateCharacter extends ParseNode {}
+class TemplateCharacter extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('$')) {
+            if (!Parser.test('{')) {
+                return new TemplateCharacter(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+
+        if (Parser.test('\\')) {
+            let bt1 = Parser.pos;
+            if (c=EscapeSequence.tryMatch()) return new TemplateCharacter(bt,Parser.pos,[c])
+            
+            Parser.goto(bt1)
+
+            if (c=NotEscapeSequence.tryMatch()) return new TemplateCharacter(bt,Parser.pos,[c])
+        }
+
+        Parser.goto(bt)
+
+        if (c=LineContinuaton.tryMatch()) {
+            return new TemplateCharacter(bt, Parser.pos, [c])
+        }
+
+        Parser.goto(bt)
+
+        if (c=LineTerminatorSequence.tryMatch()) {
+            return new TemplateCharacter(bt,Parser.posm [c])
+        }
+
+        Parser.goto(bt)
+
+        if (!Parser.test('`')) {
+            if (!Parser.test('\\')) {
+                if (!Parser.test('$')) {
+                    if (!LineTerminator.tryMatch()) {
+                        return new TemplateCharacter(bt, Parser.pos)
+                    }
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
 class NotEscapeSequence extends ParseNode {}
 class NotCodePoint extends ParseNode {}
 class CodePoint extends ParseNode {}
