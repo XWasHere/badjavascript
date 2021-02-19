@@ -684,7 +684,13 @@ class TemplateCharacter extends ParseNode {
 class NotEscapeSequence extends ParseNode {}
 class NotCodePoint extends ParseNode {}
 class CodePoint extends ParseNode {}
-class IdentifierReference extends ParseNode {}
+class IdentifierReference extends ParseNode {
+    static tryMatch(y,a) {
+        let bt = Parser.pos;
+        let c
+        if (c=Identifier.tryMatch()) return new BindingIdentifier(bt,Parser.pos,[c])
+    }
+}
 
 class BindingIdentifier extends ParseNode {
     static tryMatch(y,a) {
@@ -1029,8 +1035,14 @@ class DestructuringAssignmentTarget extends ParseNode {}
 class Expression extends ParseNode {
     static tryMatch(i,y,a) {
         let bt = Parser.pos;
-        let c = AssignmentExpression.tryMatch(i,y,a);
-        if (c) return new AssignmentElement(bt,Parser.pos,[c])
+        let c = []
+        while (true) {
+            let e = AssignmentExpression.tryMatch(i,y,a);
+            if (!e) break
+            c.push(e)
+            if (!Parser.test(',')) break
+        }
+        if (c.length>0) return new Expression(bt,Parser.pos,c)
     }
 }
 
