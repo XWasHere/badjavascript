@@ -487,7 +487,27 @@ class LineContinuaton extends ParseNode {
         Parser.goto(bt)
     }
 }
-class EscapeSequence extends ParseNode {}
+class EscapeSequence extends ParseNode {
+    static tryMatch() {
+        let c;
+        if (c=CharacterEscapeSequence.tryMatch()) {
+            return new EscapeSequence(c.start,c.end,[c])
+        }
+        if (Parser.tryMatch('0')) {
+            let bt = Parser.pos;
+            if (!DecimalDigit.tryMatch()) {
+                Parser.goto(bt)
+                return new EscapeSequence(bt-1,bt) 
+            }
+        }
+        if (c=HexEscapeSequence.tryMatch()) {
+            return new EscapeSequence(c.start,c.end,[c])
+        }
+        if (c=UnicodeEscapeSequence.tryMatch()) {
+            return new EscapeSequence(c.start,c.end,[c])
+        }
+    }
+}
 class CharacterEscapeSequence extends ParseNode {}
 class SingleEscapeSequence extends ParseNode {}
 class NonEscapeCharacter extends ParseNode {}
