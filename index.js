@@ -671,6 +671,7 @@ class TemplateCharacter extends ParseNode {
             if (!Parser.test('\\')) {
                 if (!Parser.test('$')) {
                     if (!LineTerminator.tryMatch()) {
+                        Parser.goto(Parser.pos+1)
                         return new TemplateCharacter(bt, Parser.pos)
                     }
                 }
