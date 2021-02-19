@@ -1,3 +1,10 @@
+const CHAR = {
+    LF: "\u000a",
+    CR: "\u000d",
+    LS: "\u2028",
+    PS: "\u2029"
+}
+
 class ParseNode {
     children = [];
     start = 0;
@@ -387,12 +394,99 @@ class HexDigit extends ParseNode {
         }
     }
 }
-class StringLiteral extends ParseNode {}
-class DoubleStringCharacters extends ParseNode {}
-class SingleStringCharacters extends ParseNode {}
-class SingleStringCharacter extends ParseNode {}
-class DoubleStringCharacter extends ParseNode {}
-class LineContinuaton extends ParseNode {}
+class StringLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        let c;
+        if (Parser.test('"')) {
+            if (c=DoubleStringCharacters.tryMatch()) {
+                if (Parser.test('"')) return new StringLiteral(bt,Parser.pos,[c])
+            }
+            else if (Parser.test('"')) return new StringLiteral(bt,Parser.pos)
+        }
+        if (Parser.test("'")) {
+            if (c=SingleStringCharacters.tryMatch()) {
+                if (Parser.test("'")) return new StringLiteral(bt,Parser.pos,[c])
+            }
+            else if (Parser.test("'")) return new StringLiteral(bt,Parser.pos)
+        }
+    }
+}
+class DoubleStringCharacters extends ParseNode {
+    static tryMatch() {
+        let c = []
+        while (true) {
+            let d
+            if (d=DoubleStringCharacter.tryMatch()) c.push(d)
+            else break;
+        }
+        if (c.length>0) return new DoubleStringCharacters(c[0].start,Parser.pos,c)
+    }
+}
+class SingleStringCharacters extends ParseNode {
+    static tryMatch() {
+        let c = []
+        while (true) {
+            let d
+            if (d=SingleStringCharacter.tryMatch()) c.push(d)
+            else break;
+        }
+        if (c.length>0) return new SingleStringCharacters(c[0].start,Parser.pos,c)
+    }
+}
+
+class SingleStringCharacter extends ParseNode {
+    static tryMatch() {
+        if (!(Parser.test("'",false) || Parser.test("\\",false) || Parser.prodTest(LineTerminator))) {
+            Parser.goto(Parser.pos+1)
+            return new SingleStringCharacter(Parser.pos-1,Parser.pos)
+        }
+        else if (Parser.test(CHAR.LS)) {return new SingleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test(CHAR.PS)) {return new SingleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test('\\')) {
+            let c;
+            let bt = Parser.pos-1
+            if (c=EscapeSequence.tryMatch()) {return new SingleStringCharacter(bt,Parser.pos,[c])}
+            else {
+                Parser.goto(bt)
+                if (c= LineTerminator.tryMatch) {return new SingleStringCharacter(bt,Parser.pos,[c])}
+                else return
+            }
+        }
+        else return
+    }
+}
+
+class DoubleStringCharacter extends ParseNode {
+    static tryMatch() {
+        if (!(Parser.test('"',false) || Parser.test("\\",false) || Parser.prodTest(LineTerminator))) {
+            Parser.goto(Parser.pos+1)
+            return new DoubleStringCharacter(Parser.pos-1,Parser.pos)
+        }
+        else if (Parser.test(CHAR.LS)) {return new DoubleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test(CHAR.PS)) {return new DoubleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test('\\')) {
+            let c;
+            let bt = Parser.pos-1
+            if (c=EscapeSequence.tryMatch()) {return new DoubleStringCharacter(bt,Parser.pos,[c])}
+            else {
+                Parser.goto(bt)
+                if (c= LineTerminator.tryMatch) {return new DoubleStringCharacter(bt,Parser.pos,[c])}
+                else return
+            }
+        }
+        else return
+    }
+}
+class LineContinuaton extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (!Parser.test('\\')) return
+        let c;
+        if (c=LineTerminatorSequence.tryMatch()) return new LineContinuaton(bt,c.end,[c])
+        Parser.goto(bt)
+    }
+}
 class EscapeSequence extends ParseNode {}
 class CharacterEscapeSequence extends ParseNode {}
 class SingleEscapeSequence extends ParseNode {}
@@ -504,7 +598,7 @@ class TemplateMiddleList extends ParseNode {}
 class MemberExpression extends ParseNode {
     static tryMatch(y,a) {
         let c = PrimaryExpression.tryMatch(y,a)
-        if (c) return new MemberExpression(c.start,c.end,c)
+        if (c) return new MemberExpression(c.start,c.end,[c])
     }
 }
 class SuperProperty extends ParseNode {}
@@ -641,7 +735,7 @@ class ShortCircuitExpression extends ParseNode {
 class ConditionalExpression extends ParseNode {
     static tryMatch(i,y,a) {
         let c = ShortCircuitExpression.tryMatch(i,y,a)
-        if (c) return new ConditionalExpression(i,y,a)
+        if (c) return new ConditionalExpression(c.start,c.end,[c])
     }
 }
 
@@ -948,6 +1042,7 @@ class Parser {
     static get;
     static consumews;
     static test;
+    static prodTest;
 
     src = '';
     pos = 0;
@@ -958,6 +1053,7 @@ class Parser {
         Parser.get  = this.get.bind(this);
         Parser.consumews = this.consumews.bind(this);
         Parser.test = this.test.bind(this);
+        Parser.prodTest = this.prodTest.bind(this)
         Object.defineProperty(Parser, 'src', {
             get: (() => {
                 return this.src;
@@ -1008,6 +1104,13 @@ class Parser {
         return true
     }
 
+    prodTest(NonTerminal, ntParams = [], consumeIfTrue = false) {
+        let bt = this.pos;
+        let t = NonTerminal.tryMatch(...ntParams);
+        if (!consumeIfTrue) this.goto(bt)
+        if (t) return true
+        else return false
+    }
     ParseScript(sourceText) {
         this.src = sourceText;
         this.pos = 0;
@@ -1026,8 +1129,17 @@ let e = 1.0;
 let f = 1e+1;
 let g = 0b1;
 let h = 0o1;
-let i = 0x1;`
+let i = 0x1;
+
+let j = "Hello World!";
+let k = 'pog.';`
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
-console.log(s.ECMAScriptCode)
+function dbgtree(t) {
+	console.log(t.constructor.name + ': ' + source.substr(t.start,t.end-t.start))
+	t.children.forEach((c) => {
+		dbgtree(c)
+	})
+}
+dbgtree(s.ECMAScriptCode)
