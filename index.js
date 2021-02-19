@@ -517,7 +517,13 @@ class TemplateCharacter extends ParseNode {}
 class NotEscapeSequence extends ParseNode {}
 class NotCodePoint extends ParseNode {}
 class CodePoint extends ParseNode {}
-class IdentifierReference extends ParseNode {}
+class IdentifierReference extends ParseNode {
+    static tryMatch(y,a) {
+        let bt = Parser.pos;
+        let c
+        if (c=Identifier.tryMatch()) return new BindingIdentifier(bt,Parser.pos,[c])
+    }
+}
 
 class BindingIdentifier extends ParseNode {
     static tryMatch(y,a) {
