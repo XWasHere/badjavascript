@@ -711,7 +711,7 @@ class PrimaryExpression extends ParseNode {
         if (c = CoverParenthesizedExpressionAndArrowParameterList.tryMatch(y,a)) {
             return new PrimaryExpression(bt,Parser.pos,[c])
         }
-        
+
         Parser.goto(bt)
     }
 }
@@ -754,10 +754,67 @@ class Initializer extends ParseNode {
     }
 }
 
-class TemplateLiteral extends ParseNode {}
-class SubstitutionTemplate extends ParseNode {}
-class TemplateSpans extends ParseNode {}
-class TemplateMiddleList extends ParseNode {}
+class TemplateLiteral extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=NoSubstitutionTemplate.tryMatch()) return new TemplateLiteral(bt,Parser.pos,[c])
+        if (c=SubstitutionTemplate.tryMatch(y,a,t)) return new TemplateLiteral(bt,Parser.pos,[c])
+        
+        Parser.goto(bt);
+    }
+}
+
+class SubstitutionTemplate extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c,d,e;
+
+        if (c=TemplateHead.tryMatch()) {
+            if (d=Expression.tryMatch(1,y,a)) {
+                if (e=TemplateSpans.tryMatch(y,a,t)) {
+                    return new SubstitutionTemplate(bt, Parser.pos, [c,d,e])
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateSpans extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c,d;
+        
+        if (c=TemplateTail.tryMatch()) return new TemplateSpans(bt,Parser.pos,[c])
+        if (c=TemplateMiddleList.tryMatch(y,a,t)) {
+            if (d=TemplateTail.tryMatch()) return new TemplateSpans(bt,Parser.pos,[c])
+        }
+
+        Parser.goto(bt);
+    }
+}
+class TemplateMiddleList extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c,d;
+        let e = []
+        while (true) {
+            if (c=TemplateMiddle.tryMatch()) {
+                if (d=Expression.tryMatch(1,y,a)) e.push(c,d)
+                else break
+            }
+            else break
+        }
+
+        if (e.length>0) {
+            return new TemplateMiddleList(bt,Parser.pos,e)
+        }
+
+        Parser.goto(bt)
+    }
+}
 class MemberExpression extends ParseNode {
     static tryMatch(y,a) {
         let c = PrimaryExpression.tryMatch(y,a)
@@ -1298,7 +1355,8 @@ let j = "Hello World!";
 let k = 'pog.';
 
 let l = \`\`;
-let m = \`cool\`;`
+let m = \`cool\`;
+let n = \`super duper \${m} \${k}\`;`;
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
