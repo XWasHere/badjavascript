@@ -495,7 +495,24 @@ class EscapeCharacter extends ParseNode {}
 class HexEscapeSequence extends ParseNode {}
 class UnicodeEscapeSequence extends ParseNode {}
 class Hex4Digits extends ParseNode {}
-class RegularExpressionLiteral extends ParseNode {}
+class RegularExpressionLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c,d;
+
+        if (Parser.test('/')) {
+            if (c=RegularExpressionBody.tryMatch()) {
+                if (Parser.test('/')) {
+                    if (d=RegularExpressionFlags.tryMatch()) {
+                        return new RegularExpressionLiteral(bt, Parser.pos, [c,d])
+                    }
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
 class RegularExpressionBody extends ParseNode {}
 class RegularExpressionChars extends ParseNode {}
 class RegularExpressionFirstChar extends ParseNode {}
@@ -1138,7 +1155,9 @@ let h = 0o1;
 let i = 0x1;
 
 let j = "Hello World!";
-let k = 'pog.';`
+let k = 'pog.';
+
+let p = /hello *[wW]orld./;`
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
