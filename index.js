@@ -506,8 +506,38 @@ class RegularExpressionClass extends ParseNode {}
 class RegularExpressionClassChars extends ParseNode {}
 class RegularExpressionClassChar extends ParseNode {}
 class RegularExpressionFlags extends ParseNode {}
-class Template extends ParseNode {}
-class NoSubstitutionTemplate extends ParseNode {}
+class Template extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=NoSubstitutionTemplate.tryMatch()) return new Template(c.start,c.end,[c])
+        if (c=TemplateHead.tryMatch()) return new Template(c.start,c.end,[c])
+        
+        Parser.goto(bt);
+    }
+}
+class NoSubstitutionTemplate extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('`')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('`')) {
+                    return new NoSubstitutionTemplate(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('`')) {
+                return new NoSubstitutionTemplate(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
 class TemplateHead extends ParseNode {}
 class TemplateSubstitutionTail extends ParseNode {}
 class TemplateMiddle extends ParseNode {}
