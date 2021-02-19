@@ -757,7 +757,13 @@ class AssignmentProperty extends ParseNode {}
 class AssignmentElement extends ParseNode {}
 class AssignmentRestElement extends ParseNode {}
 class DestructuringAssignmentTarget extends ParseNode {}
-class Expression extends ParseNode {}
+class Expression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let bt = Parser.pos;
+        let c = AssignmentExpression.tryMatch(i,y,a);
+        if (c) return new AssignmentElement(bt,Parser.pos,[c])
+    }
+}
 
 class Statement extends ParseNode {
     
