@@ -1026,7 +1026,9 @@ class AssignmentProperty extends ParseNode {}
 class AssignmentElement extends ParseNode {}
 class AssignmentRestElement extends ParseNode {}
 class DestructuringAssignmentTarget extends ParseNode {}
-class Expression extends ParseNode {}
+class Expression extends ParseNode {
+    
+}
 
 class Statement extends ParseNode {
     
