@@ -612,7 +612,25 @@ class TemplateTail extends ParseNode {
         Parser.goto(bt)
     }
 }
-class TemplateCharacters extends ParseNode {}
+class TemplateCharacters extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c = []
+        let d = 0
+        
+        while (true) {
+            let e = TemplateCharacter.tryMatch()
+            if (e) {
+                c.push(e)
+                d = 1
+            }
+            else break
+        }
+        if (d) return new TemplateCharacters(c[0].start,Parser.pos,c)
+        
+        Parser.goto(bt)
+    }
+}
 class TemplateCharacter extends ParseNode {}
 class NotEscapeSequence extends ParseNode {}
 class NotCodePoint extends ParseNode {}
@@ -639,17 +657,62 @@ class Identifier extends ParseNode {
 
 class PrimaryExpression extends ParseNode {
     static tryMatch(y,a) {
-        console.log('p')
+        let bt = Parser.pos
         let c
+        
         if (Parser.test('this')) {
-            
+            return new PrimaryExpression(bt,Parser.pos)
         }
-        else if (c=IdentifierReference.tryMatch(y,a)) {
-            console.log('a')
+        
+        if (c=IdentifierReference.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
         }
-        else if (c=Literal.tryMatch()) {
-            return new PrimaryExpression(c.start,c.end,[c])
+        
+        if (c=Literal.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
         }
+
+        if (c = ArrayLiteral.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = ObjectLiteral.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = FunctionExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = ClassExpression.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = GeneratorExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = AsyncFunctionExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = AsyncGeneratorExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = RegularExpressionLiteral.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = TemplateLiteral.tryMatch(y,a,0)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = CoverParenthesizedExpressionAndArrowParameterList.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+        
+        Parser.goto(bt)
     }
 }
 
@@ -1232,7 +1295,10 @@ let h = 0o1;
 let i = 0x1;
 
 let j = "Hello World!";
-let k = 'pog.';`
+let k = 'pog.';
+
+let l = \`\`;
+let m = \`cool\`;`
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
