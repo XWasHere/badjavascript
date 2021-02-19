@@ -478,7 +478,15 @@ class DoubleStringCharacter extends ParseNode {
         else return
     }
 }
-class LineContinuaton extends ParseNode {}
+class LineContinuaton extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (!Parser.test('\\')) return
+        let c;
+        if (c=LineTerminatorSequence.tryMatch()) return new LineContinuaton(bt,c.end,[c])
+        Parser.goto(bt)
+    }
+}
 class EscapeSequence extends ParseNode {}
 class CharacterEscapeSequence extends ParseNode {}
 class SingleEscapeSequence extends ParseNode {}
