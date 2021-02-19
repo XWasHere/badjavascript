@@ -508,13 +508,95 @@ class EscapeSequence extends ParseNode {
         }
     }
 }
-class CharacterEscapeSequence extends ParseNode {}
-class SingleEscapeSequence extends ParseNode {}
-class NonEscapeCharacter extends ParseNode {}
-class EscapeCharacter extends ParseNode {}
-class HexEscapeSequence extends ParseNode {}
-class UnicodeEscapeSequence extends ParseNode {}
-class Hex4Digits extends ParseNode {}
+class CharacterEscapeSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=SingleEscapeCharacter.tryMatch()) return new CharacterEscapeSequence(c.start,c.end,[c])
+        if (c=NonEscapeCharacter.tryMatch()) return new CharacterEscapeSequence(c.start,c.end,[c])
+
+        Parser.goto(bt);
+    }
+}
+class SingleEscapeCharacter extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (/['"\\bfnrtv]/.Parser.peek()) {
+            Parser.goto(bt+1)
+            return new SingleEscapeCharacter(bt,Parser.pos)
+        }
+    }
+}
+class NonEscapeCharacter extends ParseNode {
+    // todo: matching
+}
+class EscapeCharacter extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        let c;
+        if (c=SingleEscapeCharacter.tryMatch()) return new EscapeCharacter(c.start,c.end,[c])
+        if (c=DecimalDigit.tryMatch()) return new EscapeCharacter(c.start,c.end,[c])
+        c = Parser.get()
+        if (c=='x' || c == 'u') return new EscapeCharacter(Parser.pos-1,Parser.pos)
+        else Parser.goto(bt)
+    }
+}
+class HexEscapeSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        let c;
+        let d;
+
+        if (Parser.test('x')) {
+            if (c=HexDigit.tryMatch()) {
+                if (d = HexDigit.tryMatch()) {
+                    return new HexEscapeSequence(bt,d.end,[c,d])
+                }
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class UnicodeEscapeSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let bt1;
+        let c;
+
+        if (Parser.test('u')) {
+            bt1 = Parser.pos
+            if (c=Hex4Digits.tryMatch) {
+                return new UnicodeEscapeSequence(bt,c.end,[c])
+            }
+            Parser.goto(bt1)
+            if (Parser.test('{')) {
+                if (c=CodePoint.tryMatch()) {
+                    if (Parser.test('}')) return new UnicodeEscapeSequence(bt,Parser.pos,[c])
+                }
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class Hex4Digits extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c,d,e,f;
+
+        if (c=HexDigit.tryMatch()) {
+            if (d=HexDigit.tryMatch()) {
+                if (e=HexDigit.tryMatch()) {
+                    if (f=HexDigit.tryMatch()) {
+                        return new Hex4Digits(c.start,f.end,[c,d,e,f])
+                    }
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
 class RegularExpressionLiteral extends ParseNode {}
 class RegularExpressionBody extends ParseNode {}
 class RegularExpressionChars extends ParseNode {}
