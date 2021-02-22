@@ -513,16 +513,151 @@ class RegularExpressionLiteral extends ParseNode {
         Parser.goto(bt)
     }
 }
-class RegularExpressionBody extends ParseNode {}
-class RegularExpressionChars extends ParseNode {}
-class RegularExpressionFirstChar extends ParseNode {}
-class RegularExpressionChar extends ParseNode {}
-class RegularExpressionBackslashSequence extends ParseNode {}
-class RegularExpressionNonTerminator extends ParseNode {}
-class RegularExpressionClass extends ParseNode {}
-class RegularExpressionClassChars extends ParseNode {}
-class RegularExpressionClassChar extends ParseNode {}
-class RegularExpressionFlags extends ParseNode {}
+class RegularExpressionBody extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c,d;
+        
+        if (c=RegularExpressionFirstChar.tryMatch()) {
+            if (d=RegularExpressionChars.tryMatch()) {
+                return new RegularExpressionBody(bt, Parser.pos, [c,d])
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionChars extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c  = []
+        while (true) {
+            let d = RegularExpressionChar.tryMatch();
+            if (d) c.push(d)
+            else break
+        }
+        return new RegularExpressionChars(bt,Parser.pos,c)
+    }
+}
+class RegularExpressionFirstChar extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (c=RegularExpressionNonTerminator.tryMatch()) {
+            let d = Parser.peek()
+            if (!(d=='*'||d=='\\'||d=='/'||d=='[')) {
+                return new RegularExpressionFirstChar(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionBackslashSequence.tryMatch()) {
+            return new RegularExpressionFirstChar(bt,Parser.pos,[c]);
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionClass.tryMatch()) {
+            return new RegularExpressionFirstChar(bt,Parser.pos,[c])
+        }
+        Parser.goto(bt);
+    }
+}
+class RegularExpressionChar extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (c=RegularExpressionNonTerminator.tryMatch()) {
+            let d = Parser.peek(-1)
+            if (!(d=='\\'||d=='/'||d=='[')) {
+                return new RegularExpressionChar(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionBackslashSequence.tryMatch()) {
+            return new RegularExpressionChar(bt,Parser.pos,[c]);
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionClass.tryMatch()) {
+            return new RegularExpressionChar(bt,Parser.pos,[c])
+        }
+        Parser.goto(bt);
+    }
+}
+class RegularExpressionBackslashSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (Parser.test('\\')) {
+            if (c=RegularExpressionNonTerminator.tryMatch()) {
+                return new RegularExpressionBackslashSequence(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionNonTerminator extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (!LineTerminator.tryMatch()) {
+            Parser.goto(Parser.pos+1)
+            return new RegularExpressionNonTerminator(bt,Parser.pos)
+        }
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionClass extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (Parser.test('[')) {
+            let c;
+            if (c=RegularExpressionClassChars.tryMatch()) {
+                if (Parser.test(']')) {
+                    return new RegularExpressionClass(bt,Parser.pos,[c])
+                }
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionClassChars extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c  = []
+        while (true) {
+            let d = RegularExpressionClassChar.tryMatch();
+            if (d) c.push(d)
+            else break
+        }
+        return new RegularExpressionClassChars(bt,Parser.pos,c)
+    }
+}
+class RegularExpressionClassChar extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (c=RegularExpressionNonTerminator.tryMatch()) {
+            let d = Parser.peek(-1)
+            if (!(d==']'||d=='\\')) {
+                return new RegularExpressionClassChar(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionBackslashSequence.tryMatch()) {
+            return new RegularExpressionClassChar.tryMatch(bt,Parser.pos,[c])
+        }
+        Parser.goto(bt);
+    }
+}
+class RegularExpressionFlags extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c  = []
+        while (true) {
+            let d = IdentifierPart.tryMatch();
+            if (d) c.push(d)
+            else break
+        }
+        return new RegularExpressionFlags(bt,Parser.pos,c)
+    }
+}
 class Template extends ParseNode {}
 class NoSubstitutionTemplate extends ParseNode {}
 class TemplateHead extends ParseNode {}
@@ -565,6 +700,9 @@ class PrimaryExpression extends ParseNode {
             console.log('a')
         }
         else if (c=Literal.tryMatch()) {
+            return new PrimaryExpression(c.start,c.end,[c])
+        }
+        else if (c=RegularExpressionLiteral.tryMatch()) {
             return new PrimaryExpression(c.start,c.end,[c])
         }
     }
