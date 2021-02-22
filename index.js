@@ -1,3 +1,10 @@
+const CHAR = {
+    LF: "\u000a",
+    CR: "\u000d",
+    LS: "\u2028",
+    PS: "\u2029"
+}
+
 class ParseNode {
     children = [];
     start = 0;
@@ -387,43 +394,557 @@ class HexDigit extends ParseNode {
         }
     }
 }
-class StringLiteral extends ParseNode {}
-class DoubleStringCharacters extends ParseNode {}
-class SingleStringCharacters extends ParseNode {}
-class SingleStringCharacter extends ParseNode {}
-class DoubleStringCharacter extends ParseNode {}
-class LineContinuaton extends ParseNode {}
-class EscapeSequence extends ParseNode {}
-class CharacterEscapeSequence extends ParseNode {}
-class SingleEscapeSequence extends ParseNode {}
-class NonEscapeCharacter extends ParseNode {}
-class EscapeCharacter extends ParseNode {}
-class HexEscapeSequence extends ParseNode {}
-class UnicodeEscapeSequence extends ParseNode {}
-class Hex4Digits extends ParseNode {}
-class RegularExpressionLiteral extends ParseNode {}
-class RegularExpressionBody extends ParseNode {}
-class RegularExpressionChars extends ParseNode {}
-class RegularExpressionFirstChar extends ParseNode {}
-class RegularExpressionChar extends ParseNode {}
-class RegularExpressionBackslashSequence extends ParseNode {}
-class RegularExpressionNonTerminator extends ParseNode {}
-class RegularExpressionClass extends ParseNode {}
-class RegularExpressionClassChars extends ParseNode {}
-class RegularExpressionClassChar extends ParseNode {}
-class RegularExpressionFlags extends ParseNode {}
-class Template extends ParseNode {}
-class NoSubstitutionTemplate extends ParseNode {}
-class TemplateHead extends ParseNode {}
-class TemplateSubstitutionTail extends ParseNode {}
-class TemplateMiddle extends ParseNode {}
-class TemplateTail extends ParseNode {}
-class TemplateCharacters extends ParseNode {}
-class TemplateCharacter extends ParseNode {}
+class StringLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        let c;
+        if (Parser.test('"')) {
+            if (c=DoubleStringCharacters.tryMatch()) {
+                if (Parser.test('"')) return new StringLiteral(bt,Parser.pos,[c])
+            }
+            else if (Parser.test('"')) return new StringLiteral(bt,Parser.pos)
+        }
+        if (Parser.test("'")) {
+            if (c=SingleStringCharacters.tryMatch()) {
+                if (Parser.test("'")) return new StringLiteral(bt,Parser.pos,[c])
+            }
+            else if (Parser.test("'")) return new StringLiteral(bt,Parser.pos)
+        }
+    }
+}
+class DoubleStringCharacters extends ParseNode {
+    static tryMatch() {
+        let c = []
+        while (true) {
+            let d
+            if (d=DoubleStringCharacter.tryMatch()) c.push(d)
+            else break;
+        }
+        if (c.length>0) return new DoubleStringCharacters(c[0].start,Parser.pos,c)
+    }
+}
+class SingleStringCharacters extends ParseNode {
+    static tryMatch() {
+        let c = []
+        while (true) {
+            let d
+            if (d=SingleStringCharacter.tryMatch()) c.push(d)
+            else break;
+        }
+        if (c.length>0) return new SingleStringCharacters(c[0].start,Parser.pos,c)
+    }
+}
+
+class SingleStringCharacter extends ParseNode {
+    static tryMatch() {
+        if (!(Parser.test("'",false) || Parser.test("\\",false) || Parser.prodTest(LineTerminator))) {
+            Parser.goto(Parser.pos+1)
+            return new SingleStringCharacter(Parser.pos-1,Parser.pos)
+        }
+        else if (Parser.test(CHAR.LS)) {return new SingleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test(CHAR.PS)) {return new SingleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test('\\')) {
+            let c;
+            let bt = Parser.pos-1
+            if (c=EscapeSequence.tryMatch()) {return new SingleStringCharacter(bt,Parser.pos,[c])}
+            else {
+                Parser.goto(bt)
+                if (c= LineTerminator.tryMatch) {return new SingleStringCharacter(bt,Parser.pos,[c])}
+                else return
+            }
+        }
+        else return
+    }
+}
+
+class DoubleStringCharacter extends ParseNode {
+    static tryMatch() {
+        if (!(Parser.test('"',false) || Parser.test("\\",false) || Parser.prodTest(LineTerminator))) {
+            Parser.goto(Parser.pos+1)
+            return new DoubleStringCharacter(Parser.pos-1,Parser.pos)
+        }
+        else if (Parser.test(CHAR.LS)) {return new DoubleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test(CHAR.PS)) {return new DoubleStringCharacter(Parser.pos-1,Parser.pos)}
+        else if (Parser.test('\\')) {
+            let c;
+            let bt = Parser.pos-1
+            if (c=EscapeSequence.tryMatch()) {return new DoubleStringCharacter(bt,Parser.pos,[c])}
+            else {
+                Parser.goto(bt)
+                if (c= LineTerminator.tryMatch) {return new DoubleStringCharacter(bt,Parser.pos,[c])}
+                else return
+            }
+        }
+        else return
+    }
+}
+class LineContinuaton extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        if (!Parser.test('\\')) return
+        let c;
+        if (c=LineTerminatorSequence.tryMatch()) return new LineContinuaton(bt,c.end,[c])
+        Parser.goto(bt)
+    }
+}
+class EscapeSequence extends ParseNode {
+    static tryMatch() {
+        let c;
+        if (c=CharacterEscapeSequence.tryMatch()) {
+            return new EscapeSequence(c.start,c.end,[c])
+        }
+        if (Parser.tryMatch('0')) {
+            let bt = Parser.pos;
+            if (!DecimalDigit.tryMatch()) {
+                Parser.goto(bt)
+                return new EscapeSequence(bt-1,bt) 
+            }
+        }
+        if (c=HexEscapeSequence.tryMatch()) {
+            return new EscapeSequence(c.start,c.end,[c])
+        }
+        if (c=UnicodeEscapeSequence.tryMatch()) {
+            return new EscapeSequence(c.start,c.end,[c])
+        }
+    }
+}
+class CharacterEscapeSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=SingleEscapeCharacter.tryMatch()) return new CharacterEscapeSequence(c.start,c.end,[c])
+        if (c=NonEscapeCharacter.tryMatch()) return new CharacterEscapeSequence(c.start,c.end,[c])
+
+        Parser.goto(bt);
+    }
+}
+class SingleEscapeCharacter extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (/['"\\bfnrtv]/.Parser.peek()) {
+            Parser.goto(bt+1)
+            return new SingleEscapeCharacter(bt,Parser.pos)
+        }
+    }
+}
+class NonEscapeCharacter extends ParseNode {
+    // todo: matching
+}
+class EscapeCharacter extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        let c;
+        if (c=SingleEscapeCharacter.tryMatch()) return new EscapeCharacter(c.start,c.end,[c])
+        if (c=DecimalDigit.tryMatch()) return new EscapeCharacter(c.start,c.end,[c])
+        c = Parser.get()
+        if (c=='x' || c == 'u') return new EscapeCharacter(Parser.pos-1,Parser.pos)
+        else Parser.goto(bt)
+    }
+}
+class HexEscapeSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos
+        let c;
+        let d;
+
+        if (Parser.test('x')) {
+            if (c=HexDigit.tryMatch()) {
+                if (d = HexDigit.tryMatch()) {
+                    return new HexEscapeSequence(bt,d.end,[c,d])
+                }
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class UnicodeEscapeSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let bt1;
+        let c;
+
+        if (Parser.test('u')) {
+            bt1 = Parser.pos
+            if (c=Hex4Digits.tryMatch) {
+                return new UnicodeEscapeSequence(bt,c.end,[c])
+            }
+            Parser.goto(bt1)
+            if (Parser.test('{')) {
+                if (c=CodePoint.tryMatch()) {
+                    if (Parser.test('}')) return new UnicodeEscapeSequence(bt,Parser.pos,[c])
+                }
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class Hex4Digits extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c,d,e,f;
+
+        if (c=HexDigit.tryMatch()) {
+            if (d=HexDigit.tryMatch()) {
+                if (e=HexDigit.tryMatch()) {
+                    if (f=HexDigit.tryMatch()) {
+                        return new Hex4Digits(c.start,f.end,[c,d,e,f])
+                    }
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionLiteral extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c,d;
+
+        if (Parser.test('/')) {
+            if (c=RegularExpressionBody.tryMatch()) {
+                if (Parser.test('/')) {
+                    if (d=RegularExpressionFlags.tryMatch()) {
+                        return new RegularExpressionLiteral(bt, Parser.pos, [c,d])
+                    }
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionBody extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c,d;
+        
+        if (c=RegularExpressionFirstChar.tryMatch()) {
+            if (d=RegularExpressionChars.tryMatch()) {
+                return new RegularExpressionBody(bt, Parser.pos, [c,d])
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionChars extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c  = []
+        while (true) {
+            let d = RegularExpressionChar.tryMatch();
+            if (d) c.push(d)
+            else break
+        }
+        return new RegularExpressionChars(bt,Parser.pos,c)
+    }
+}
+class RegularExpressionFirstChar extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (c=RegularExpressionNonTerminator.tryMatch()) {
+            let d = Parser.peek()
+            if (!(d=='*'||d=='\\'||d=='/'||d=='[')) {
+                return new RegularExpressionFirstChar(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionBackslashSequence.tryMatch()) {
+            return new RegularExpressionFirstChar(bt,Parser.pos,[c]);
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionClass.tryMatch()) {
+            return new RegularExpressionFirstChar(bt,Parser.pos,[c])
+        }
+        Parser.goto(bt);
+    }
+}
+class RegularExpressionChar extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (c=RegularExpressionNonTerminator.tryMatch()) {
+            let d = Parser.peek(-1)
+            if (!(d=='\\'||d=='/'||d=='[')) {
+                return new RegularExpressionChar(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionBackslashSequence.tryMatch()) {
+            return new RegularExpressionChar(bt,Parser.pos,[c]);
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionClass.tryMatch()) {
+            return new RegularExpressionChar(bt,Parser.pos,[c])
+        }
+        Parser.goto(bt);
+    }
+}
+class RegularExpressionBackslashSequence extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (Parser.test('\\')) {
+            if (c=RegularExpressionNonTerminator.tryMatch()) {
+                return new RegularExpressionBackslashSequence(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionNonTerminator extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (!LineTerminator.tryMatch()) {
+            Parser.goto(Parser.pos+1)
+            return new RegularExpressionNonTerminator(bt,Parser.pos)
+        }
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionClass extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        if (Parser.test('[')) {
+            let c;
+            if (c=RegularExpressionClassChars.tryMatch()) {
+                if (Parser.test(']')) {
+                    return new RegularExpressionClass(bt,Parser.pos,[c])
+                }
+            }
+        }
+        Parser.goto(bt)
+    }
+}
+class RegularExpressionClassChars extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c  = []
+        while (true) {
+            let d = RegularExpressionClassChar.tryMatch();
+            if (d) c.push(d)
+            else break
+        }
+        return new RegularExpressionClassChars(bt,Parser.pos,c)
+    }
+}
+class RegularExpressionClassChar extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        if (c=RegularExpressionNonTerminator.tryMatch()) {
+            let d = Parser.peek(-1)
+            if (!(d==']'||d=='\\')) {
+                return new RegularExpressionClassChar(bt,Parser.pos,[c])
+            }
+        }
+        Parser.goto(bt);
+        if (c=RegularExpressionBackslashSequence.tryMatch()) {
+            return new RegularExpressionClassChar.tryMatch(bt,Parser.pos,[c])
+        }
+        Parser.goto(bt);
+    }
+}
+class RegularExpressionFlags extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c  = []
+        while (true) {
+            let d = IdentifierPart.tryMatch();
+            if (d) c.push(d)
+            else break
+        }
+        return new RegularExpressionFlags(bt,Parser.pos,c)
+    }
+}
+class Template extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=NoSubstitutionTemplate.tryMatch()) return new Template(c.start,c.end,[c])
+        if (c=TemplateHead.tryMatch()) return new Template(c.start,c.end,[c])
+        
+        Parser.goto(bt);
+    }
+}
+class NoSubstitutionTemplate extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('`')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('`')) {
+                    return new NoSubstitutionTemplate(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('`')) {
+                return new NoSubstitutionTemplate(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateHead extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('`')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('${')) {
+                    return new TemplateHead(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('${')) {
+                return new TemplateHead(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateSubstitutionTail extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=TemplateMiddle.tryMatch()) return new TemplateSubstitutionTail(c.start,c.end,[c])
+        if (c=TemplateTail.tryMatch()) return new TemplateSubstitutionTail(c.start,c.end,[c])
+        
+        Parser.goto(bt);
+    }
+}
+class TemplateMiddle extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('}')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('${')) {
+                    return new TemplateMiddle(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('${')) {
+                return new TemplateMiddle(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateTail extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('}')) {
+            let bt2 = Parser.pos;
+            if (c = TemplateCharacters.tryMatch()) {
+                if (Parser.test('`')) {
+                    return new TemplateTail(bt,Parser.pos,[c])
+                }
+            }
+            Parser.goto(bt2)
+            if (Parser.test('`')) {
+                return new TemplateTail(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateCharacters extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c = []
+        let d = 0
+        
+        while (true) {
+            let e = TemplateCharacter.tryMatch()
+            if (e) {
+                c.push(e)
+                d = 1
+            }
+            else break
+        }
+        if (d) return new TemplateCharacters(c[0].start,Parser.pos,c)
+        
+        Parser.goto(bt)
+    }
+}
+class TemplateCharacter extends ParseNode {
+    static tryMatch() {
+        let bt = Parser.pos;
+        let c;
+
+        if (Parser.test('$')) {
+            if (!Parser.test('{')) {
+                return new TemplateCharacter(bt,Parser.pos)
+            }
+        }
+
+        Parser.goto(bt)
+
+        if (Parser.test('\\')) {
+            let bt1 = Parser.pos;
+            if (c=EscapeSequence.tryMatch()) return new TemplateCharacter(bt,Parser.pos,[c])
+            
+            Parser.goto(bt1)
+
+            if (c=NotEscapeSequence.tryMatch()) return new TemplateCharacter(bt,Parser.pos,[c])
+        }
+
+        Parser.goto(bt)
+
+        if (c=LineContinuaton.tryMatch()) {
+            return new TemplateCharacter(bt, Parser.pos, [c])
+        }
+
+        Parser.goto(bt)
+
+        if (c=LineTerminatorSequence.tryMatch()) {
+            return new TemplateCharacter(bt,Parser.posm [c])
+        }
+
+        Parser.goto(bt)
+
+        if (!Parser.test('`')) {
+            if (!Parser.test('\\')) {
+                if (!Parser.test('$')) {
+                    if (!LineTerminator.tryMatch()) {
+                        Parser.goto(Parser.pos+1)
+                        return new TemplateCharacter(bt, Parser.pos)
+                    }
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
 class NotEscapeSequence extends ParseNode {}
 class NotCodePoint extends ParseNode {}
 class CodePoint extends ParseNode {}
-class IdentifierReference extends ParseNode {}
+class IdentifierReference extends ParseNode {
+    static tryMatch(y,a) {
+        let bt = Parser.pos;
+        let c
+        if (c=Identifier.tryMatch()) return new BindingIdentifier(bt,Parser.pos,[c])
+    }
+}
 
 class BindingIdentifier extends ParseNode {
     static tryMatch(y,a) {
@@ -445,17 +966,62 @@ class Identifier extends ParseNode {
 
 class PrimaryExpression extends ParseNode {
     static tryMatch(y,a) {
-        console.log('p')
+        let bt = Parser.pos
         let c
+        
         if (Parser.test('this')) {
-            
+            return new PrimaryExpression(bt,Parser.pos)
         }
-        else if (c=IdentifierReference.tryMatch(y,a)) {
-            console.log('a')
+        
+        if (c=IdentifierReference.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
         }
-        else if (c=Literal.tryMatch()) {
-            return new PrimaryExpression(c.start,c.end,[c])
+        
+        if (c=Literal.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
         }
+
+        if (c = ArrayLiteral.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = ObjectLiteral.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = FunctionExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = ClassExpression.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = GeneratorExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = AsyncFunctionExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = AsyncGeneratorExpression.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = RegularExpressionLiteral.tryMatch()) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = TemplateLiteral.tryMatch(y,a,0)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        if (c = CoverParenthesizedExpressionAndArrowParameterList.tryMatch(y,a)) {
+            return new PrimaryExpression(bt,Parser.pos,[c])
+        }
+
+        Parser.goto(bt)
     }
 }
 
@@ -497,14 +1063,71 @@ class Initializer extends ParseNode {
     }
 }
 
-class TemplateLiteral extends ParseNode {}
-class SubstitutionTemplate extends ParseNode {}
-class TemplateSpans extends ParseNode {}
-class TemplateMiddleList extends ParseNode {}
+class TemplateLiteral extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c;
+        
+        if (c=NoSubstitutionTemplate.tryMatch()) return new TemplateLiteral(bt,Parser.pos,[c])
+        if (c=SubstitutionTemplate.tryMatch(y,a,t)) return new TemplateLiteral(bt,Parser.pos,[c])
+        
+        Parser.goto(bt);
+    }
+}
+
+class SubstitutionTemplate extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c,d,e;
+
+        if (c=TemplateHead.tryMatch()) {
+            if (d=Expression.tryMatch(1,y,a)) {
+                if (e=TemplateSpans.tryMatch(y,a,t)) {
+                    return new SubstitutionTemplate(bt, Parser.pos, [c,d,e])
+                }
+            }
+        }
+
+        Parser.goto(bt)
+    }
+}
+class TemplateSpans extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c,d;
+        
+        if (c=TemplateTail.tryMatch()) return new TemplateSpans(bt,Parser.pos,[c])
+        if (c=TemplateMiddleList.tryMatch(y,a,t)) {
+            if (d=TemplateTail.tryMatch()) return new TemplateSpans(bt,Parser.pos,[c])
+        }
+
+        Parser.goto(bt);
+    }
+}
+class TemplateMiddleList extends ParseNode {
+    static tryMatch(y,a,t) {
+        let bt = Parser.pos;
+        let c,d;
+        let e = []
+        while (true) {
+            if (c=TemplateMiddle.tryMatch()) {
+                if (d=Expression.tryMatch(1,y,a)) e.push(c,d)
+                else break
+            }
+            else break
+        }
+
+        if (e.length>0) {
+            return new TemplateMiddleList(bt,Parser.pos,e)
+        }
+
+        Parser.goto(bt)
+    }
+}
 class MemberExpression extends ParseNode {
     static tryMatch(y,a) {
         let c = PrimaryExpression.tryMatch(y,a)
-        if (c) return new MemberExpression(c.start,c.end,c)
+        if (c) return new MemberExpression(c.start,c.end,[c])
     }
 }
 class SuperProperty extends ParseNode {}
@@ -641,7 +1264,7 @@ class ShortCircuitExpression extends ParseNode {
 class ConditionalExpression extends ParseNode {
     static tryMatch(i,y,a) {
         let c = ShortCircuitExpression.tryMatch(i,y,a)
-        if (c) return new ConditionalExpression(i,y,a)
+        if (c) return new ConditionalExpression(c.start,c.end,[c])
     }
 }
 
@@ -663,7 +1286,19 @@ class AssignmentProperty extends ParseNode {}
 class AssignmentElement extends ParseNode {}
 class AssignmentRestElement extends ParseNode {}
 class DestructuringAssignmentTarget extends ParseNode {}
-class Expression extends ParseNode {}
+class Expression extends ParseNode {
+    static tryMatch(i,y,a) {
+        let bt = Parser.pos;
+        let c = []
+        while (true) {
+            let e = AssignmentExpression.tryMatch(i,y,a);
+            if (!e) break
+            c.push(e)
+            if (!Parser.test(',')) break
+        }
+        if (c.length>0) return new Expression(bt,Parser.pos,c)
+    }
+}
 
 class Statement extends ParseNode {
     
@@ -948,6 +1583,7 @@ class Parser {
     static get;
     static consumews;
     static test;
+    static prodTest;
 
     src = '';
     pos = 0;
@@ -958,6 +1594,7 @@ class Parser {
         Parser.get  = this.get.bind(this);
         Parser.consumews = this.consumews.bind(this);
         Parser.test = this.test.bind(this);
+        Parser.prodTest = this.prodTest.bind(this)
         Object.defineProperty(Parser, 'src', {
             get: (() => {
                 return this.src;
@@ -1008,6 +1645,13 @@ class Parser {
         return true
     }
 
+    prodTest(NonTerminal, ntParams = [], consumeIfTrue = false) {
+        let bt = this.pos;
+        let t = NonTerminal.tryMatch(...ntParams);
+        if (!consumeIfTrue) this.goto(bt)
+        if (t) return true
+        else return false
+    }
     ParseScript(sourceText) {
         this.src = sourceText;
         this.pos = 0;
@@ -1026,8 +1670,24 @@ let e = 1.0;
 let f = 1e+1;
 let g = 0b1;
 let h = 0o1;
-let i = 0x1;`
+let i = 0x1;
+
+let j = "Hello World!";
+let k = 'pog.';
+
+let l = \`\`;
+let m = \`cool\`;
+let n = \`super duper \${m} \${k}\`;
+
+let o = /hello *[wW]orld./;`
+
 dbg = 0
 let a = new Parser()
 let s = a.ParseScript(source)
-console.log(s.ECMAScriptCode)
+function dbgtree(t) {
+	console.log(t.constructor.name + ': ' + source.substr(t.start,t.end-t.start))
+	t.children.forEach((c) => {
+		dbgtree(c)
+	})
+}
+dbgtree(s.ECMAScriptCode)
