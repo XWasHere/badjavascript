@@ -6,9 +6,9 @@ const CHAR = {
 }
 
 class ParseNode {
-    children = [];
-    start = 0;
-    end = 0;
+    children;
+    start;
+    end;
     
     /**
      * The generic Parse Node constructor.
